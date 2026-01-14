@@ -28,7 +28,7 @@ Writing the messages to the outfile as defined in the arguments list
 */
 func (b BackintResultMessages) Dump() {
 	for _, message := range b {
-		fmt.Fprintln(GetLogFile(), message)
+		_, _ = fmt.Fprintln(GetLogFile(), message)
 	}
 }
 

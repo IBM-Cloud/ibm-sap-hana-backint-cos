@@ -55,7 +55,10 @@ func ReadApikeyFromFile(authKeypath string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer authFile.Close()
+
+	defer func() {
+		_ = authFile.Close()
+	}()
 
 	scanner := bufio.NewScanner(authFile)
 	var fileContent []string

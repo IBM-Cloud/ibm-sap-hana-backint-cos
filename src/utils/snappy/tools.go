@@ -124,7 +124,10 @@ func writeLinesToFile(fileName string, lines []string) bool {
 	if err != nil {
 		return false
 	}
-	defer f.Close()
+
+	defer func() {
+		_ = f.Close()
+	}()
 
 	for _, line := range lines {
 		_, err = fmt.Fprintln(f, line)

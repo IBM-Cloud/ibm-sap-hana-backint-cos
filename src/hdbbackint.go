@@ -111,7 +111,7 @@ func main() {
 	logging.BackintResultMsgs.Dump()
 
 	// Closing the logfile
-	global.Logger.Writer().Close()
+	_ = global.Logger.Writer().Close()
 
 	if success {
 		os.Exit(global.SUCCESS)

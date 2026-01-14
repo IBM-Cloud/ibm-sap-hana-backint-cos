@@ -152,7 +152,10 @@ Writing the input file content
 */
 func logInputFile(logger *logrus.Logger) {
 	f, _ := os.Open(global.Args.InputFile)
-	defer f.Close()
+	defer func() {
+		_ = f.Close()
+	}()
+
 	logger.Debug("Content of input file:")
 	logger.Debug("=================================================================")
 	fScanner := bufio.NewScanner(f)

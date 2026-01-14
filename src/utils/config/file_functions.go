@@ -18,7 +18,10 @@ func ReadInputFile(filePath string) []global.InputFileContentT {
 	if err != nil {
 		return nil
 	}
-	defer f.Close()
+
+	defer func() {
+		_ = f.Close()
+	}()
 
 	var inputFileContentList []global.InputFileContentT
 
