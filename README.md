@@ -49,7 +49,9 @@ SAP HANA, Backint, IBM, Cloud Object Storage, Backup and Recovery, Power Virtual
 
 ## Install the agent
 
-1. **Unpack the package** to a directory of your choice with the correct permissions in the system.
+1. Download the latest release from [github repository](https://github.com/IBM-Cloud/ibm-sap-hana-backint-cos/releases).
+
+2. **Unpack the package** to a directory of your choice with the correct permissions in the system.
 
    The extracted package contains
 
@@ -58,7 +60,7 @@ SAP HANA, Backint, IBM, Cloud Object Storage, Backup and Recovery, Power Virtual
    * Readme.pdf: Agent **manual**
 
 
-2. **Create Symbolic Links**
+3. **Create Symbolic Links**
 
 SAP HANA expects the Backint agent executable (hdbbackint) to be in the following path:
 
@@ -68,7 +70,7 @@ SAP HANA expects the Backint agent executable (hdbbackint) to be in the followin
    * Option 2: Create a symbolic link that points from `/usr/sap/<SID>/SYS/global/hdb/opt/hdbbackint` to the "hdbbackint" executable that was extracted from the package.
 
 
-3. **Configure the IBM Backint agent for SAP HANA with IBM Cloud Object Storage**
+4. **Configure the IBM Backint agent for SAP HANA with IBM Cloud Object Storage**
 
 The IBM Backint agent for SAP HANA with IBM Cloud Object Storage requires a parameter file in the INI file format.
 
@@ -152,7 +154,7 @@ Then the final storage key will be:
 `myDB/DB_<dbname>/<prefix>_databackup_2`
 
 
-4. **Configuring SAP HANA database to use the Parameter File**
+5. **Configuring SAP HANA database to use the Parameter File**
 
 SAP HANA database uses the following parameters to configure the usage of the parameter file (hdbbackint.cfg).
 
@@ -189,3 +191,33 @@ The following parameters in the "global.ini/backup" section should be set to the
    ```
 
 **Once the global.ini file is updated run "hdbnsutil -reconfig" as a SID user for changes in SAP HANA database to take effect.**
+
+6. **Recommended Configuration Parameters**
+
+**data_backup_buffer_size**
+- The value of the `data_backup_buffer_size` parameter should be set based on the total memory available on the VM. The following sizes are recommended:
+
+| System Memory     | Recommended data_backup_buffer_size |
+| ------------------| ------------------------------------|
+| < 1TB             | 1024                                |
+| ≥ 1 TB and < 6TB  | 2048                                |
+| ≥ 6 TB and < 24TB | 4096                                |
+| ≥ 24 TB           | 4096                                |
+
+**HANA & Agent Recommended Parameter Combination**
+This section lists recommended combinations of:
+
+* **HANA parameter:** parallel_data_backup_backint_channels defines how many Backint channels SAP HANA starts in parallel during a data backup.
+* **Agent parameter:** max_concurrency controls the maximum number of parallel processing threads used by the backup agent.
+
+These combinations help ensure optimal backup throughput and resource utilization.
+
+
+| HANA Parameter (parallel_data_backup_backint_channels) | Agent Parameter (max_concurrency) |
+| -------------------------------------------------------| ----------------------------------|
+| 8                                                      | 4                                 |
+| 8                                                      | 2                                 |
+| 4                                                      | 4                                 |
+| 4                                                      | 2                                 |
+
+Note: Values above these combinations generally do not provide further performance improvements and may lead to resource bottlenecks.

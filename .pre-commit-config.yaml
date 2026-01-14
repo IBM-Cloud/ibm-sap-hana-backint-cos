@@ -1,0 +1,51 @@
+repos:
+  # ------------------------
+  # Go Formatting & Analysis
+  # ------------------------
+  - repo: local
+    hooks:
+      - id: go-fmt
+        name: go fmt
+        entry: bash -c "cd src && go fmt ./..."
+        language: system
+        pass_filenames: false
+        types: [go]
+
+      - id: go-imports
+        name: go imports
+        entry: bash -c "cd src && goimports -w ."
+        language: system
+        pass_filenames: false
+        types: [go]
+
+      - id: go-vet
+        name: go vet
+        entry: bash -c "cd src && go vet ./..."
+        language: system
+        pass_filenames: false
+        types: [go]
+
+  # ------------------------
+  # GolangCI-Lint (aggregated linters)
+  # ------------------------
+  - repo: https://github.com/golangci/golangci-lint
+    rev: v1.62.0
+    hooks:
+      - id: golangci-lint
+        entry: bash -c "cd src && golangci-lint run ./..."
+        language: system
+        pass_filenames: false
+        always_run: true
+        types: [go]
+
+  # ------------------------
+  # General Code Hygiene
+  # ------------------------
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+      - id: mixed-line-ending
