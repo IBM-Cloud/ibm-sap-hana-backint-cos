@@ -214,10 +214,10 @@ These combinations help ensure optimal backup throughput and resource utilizatio
 
 
 | HANA Parameter (parallel_data_backup_backint_channels) | Agent Parameter (max_concurrency) |
-| -------------------------------------- | --------------------------------------------------|
-| 8                                      | 4                                                 |
-| 8                                      | 2                                                 |
-| 4                                      | 4                                                 |
-| 4                                      | 2                                                 |
+| -------------------------------------------------------| ----------------------------------|
+| 8                                                      | 4                                 |
+| 8                                                      | 2                                 |
+| 4                                                      | 4                                 |
+| 4                                                      | 2                                 |
 
 Note: Values above these combinations generally do not provide further performance improvements and may lead to resource bottlenecks.
