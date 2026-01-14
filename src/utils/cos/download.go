@@ -35,7 +35,10 @@ func Download(s3Client *s3.S3, element CosObject) Result {
 
 	// Opening destination pipe for writing
 	fifo := openPipeForWriting(element.Destination)
-	defer fifo.Close()
+
+	defer func() {
+		_ = fifo.Close()
+	}()
 
 	// Getting the buffer size of the pipe
 	pipeBufferSize := getPipeBufferSize(fifo)
@@ -170,7 +173,10 @@ func runDownloadSinglePart(
 		return
 	}
 
-	defer response.Body.Close()
+	defer func() {
+		_ = response.Body.Close()
+	}()
+
 	buf := new(bytes.Buffer)
 	_, err = io.Copy(buf, response.Body)
 

@@ -30,7 +30,7 @@ Getting the source paths from the input file for function = BACKUP
 func getSourcePathsForBackup() []string {
 	var sourcePaths []string
 	for _, element := range global.InputFileContent {
-		if !(element.Keyword == "PIPE") {
+		if element.Keyword != "PIPE" {
 			continue
 		}
 		sourcePaths = append(sourcePaths, element.Parameter)
