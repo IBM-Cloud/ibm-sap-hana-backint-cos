@@ -12,11 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License
 
-/*
-Default values for the backint configuration
-These values are used if the user does not specify them in the configuration file
-or as command line arguments.
-*/
 package config
 
 /*

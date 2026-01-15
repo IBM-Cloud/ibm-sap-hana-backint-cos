@@ -12,9 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License
 
-/*
-Functions for handling the input file content
-*/
 package config
 
 import (

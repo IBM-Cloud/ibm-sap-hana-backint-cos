@@ -12,9 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License
 
-/*
-Contains all datatpyes for cloud object storage handling
-*/
 package cos
 
 import (

@@ -12,9 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License
 
-/*
-Contains all datatypes for configuration
-*/
 package config
 
 // Datatype representing one parameter for backint configuration

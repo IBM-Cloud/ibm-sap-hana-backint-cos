@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License
 
-// Generating the internal backint configuration from the arguments and the hdbbackint.cfg parameter file
 package config
 
 import (

@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License
 
-// Functions for interacting with the IBM Cloud Object Storage
 package cos
 
 import (

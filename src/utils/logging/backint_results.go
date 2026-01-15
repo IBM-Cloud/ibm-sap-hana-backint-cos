@@ -12,9 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License
 
-// Functions to generate and print messages in the format required by HANA backup/restore process
-// The HANA backup/restore requires a specific format of messages in the trace file as indicator if a function
-// was executed successfully or with error.
 package logging
 
 import (

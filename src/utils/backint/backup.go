@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License
 
-// Handling the backup of a HANA system
 package backint
 
 import (

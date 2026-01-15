@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License
 
-// Functions to handle and validate the command line arguments
 package config
 
 import (

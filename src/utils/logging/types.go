@@ -12,9 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License
 
-/*
-Contains all global datatypes and variables
-*/
 package logging
 
 import "github.com/sirupsen/logrus"

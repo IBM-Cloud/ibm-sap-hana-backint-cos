@@ -12,9 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License
 
-/*
-Contains all global datatypes
-*/
 package global
 
 // Datatype representing all command line arguments
