@@ -6,10 +6,11 @@ package logging
 import (
 	"bufio"
 	"fmt"
-	"hdbbackint/utils/config"
-	"hdbbackint/utils/global"
 	"os"
 	"strings"
+
+	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/config"
+	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/global"
 
 	"github.com/sirupsen/logrus"
 )

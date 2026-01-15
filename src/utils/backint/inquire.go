@@ -1,11 +1,12 @@
 package backint
 
 import (
-	"hdbbackint/utils/cos"
-	"hdbbackint/utils/global"
-	"hdbbackint/utils/logging"
 	"sort"
 	"strings"
+
+	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/cos"
+	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/global"
+	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/logging"
 
 	"github.com/IBM/ibm-cos-sdk-go/service/s3"
 )

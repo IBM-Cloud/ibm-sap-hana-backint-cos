@@ -5,7 +5,8 @@ package logging
 
 import (
 	"fmt"
-	"hdbbackint/utils/global"
+
+	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/global"
 )
 
 /*

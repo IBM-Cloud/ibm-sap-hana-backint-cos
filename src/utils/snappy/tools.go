@@ -2,9 +2,10 @@ package snappy
 
 import (
 	"fmt"
-	"hdbbackint/utils/cos"
-	"hdbbackint/utils/global"
 	"os"
+
+	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/cos"
+	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/global"
 
 	"github.com/IBM/ibm-cos-sdk-go/service/s3"
 )

@@ -6,11 +6,12 @@ package config
 import (
 	"errors"
 	"fmt"
-	"hdbbackint/utils/global"
 	"os"
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/global"
 )
 
 /*

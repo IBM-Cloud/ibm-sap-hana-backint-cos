@@ -3,11 +3,12 @@ package cos
 
 import (
 	"fmt"
-	"hdbbackint/utils/config"
-	"hdbbackint/utils/global"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/config"
+	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/global"
 
 	"github.com/IBM/ibm-cos-sdk-go/aws"
 	"github.com/IBM/ibm-cos-sdk-go/aws/session"

@@ -3,10 +3,11 @@ package backint
 
 import (
 	"fmt"
-	"hdbbackint/utils/cos"
-	"hdbbackint/utils/global"
-	"hdbbackint/utils/logging"
 	"sync"
+
+	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/cos"
+	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/global"
+	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/logging"
 
 	"github.com/IBM/ibm-cos-sdk-go/aws/session"
 	"github.com/IBM/ibm-cos-sdk-go/service/s3"

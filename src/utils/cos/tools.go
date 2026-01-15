@@ -8,10 +8,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"hdbbackint/utils/config"
-	"hdbbackint/utils/global"
 	"os"
 	"time"
+
+	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/config"
+	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/global"
 
 	"github.com/IBM/ibm-cos-sdk-go/aws"
 	"github.com/IBM/ibm-cos-sdk-go/service/s3"
