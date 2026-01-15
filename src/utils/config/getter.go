@@ -3,7 +3,8 @@ package config
 
 import (
 	"fmt"
-	"hdbbackint/utils/global"
+
+	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/global"
 
 	"strings"
 	"time"

@@ -2,12 +2,13 @@
 package cos
 
 import (
-	"hdbbackint/utils/config"
-	"hdbbackint/utils/global"
-	"hdbbackint/utils/logging"
 	"net"
 	"net/http"
 	"time"
+
+	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/config"
+	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/global"
+	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/logging"
 
 	"github.com/IBM/ibm-cos-sdk-go/aws"
 	"github.com/IBM/ibm-cos-sdk-go/aws/credentials"

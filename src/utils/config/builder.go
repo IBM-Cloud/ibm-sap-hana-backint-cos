@@ -3,10 +3,11 @@ package config
 
 import (
 	"fmt"
-	"hdbbackint/utils/global"
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/global"
 
 	"github.com/bigkevmcd/go-configparser"
 )

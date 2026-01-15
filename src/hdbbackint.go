@@ -2,13 +2,14 @@ package main
 
 import (
 	"fmt"
-	"hdbbackint/utils/backint"
-	"hdbbackint/utils/config"
-	"hdbbackint/utils/cos"
-	"hdbbackint/utils/global"
-	"hdbbackint/utils/logging"
-	"hdbbackint/utils/snappy"
 	"os"
+
+	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/backint"
+	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/config"
+	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/cos"
+	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/global"
+	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/logging"
+	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/snappy"
 )
 
 func main() {

@@ -5,9 +5,10 @@ package config
 
 import (
 	"bufio"
-	"hdbbackint/utils/global"
 	"os"
 	"strings"
+
+	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/global"
 )
 
 /*
