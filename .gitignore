@@ -1,0 +1,57 @@
+# -------------------------------------------------
+# Go binaries & build artifacts
+# -------------------------------------------------
+hdbbackint
+hdbbackint.exe
+
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.a
+
+# Test binaries
+*.test
+
+# Coverage reports
+*.out
+coverage.html
+
+# -------------------------------------------------
+# Go workspace / module artifacts
+# -------------------------------------------------
+go.work
+go.work.sum
+
+# Vendor directory (nur ignorieren, wenn ihr kein vendoring nutzt)
+vendor/
+
+# -------------------------------------------------
+# Logs & runtime files
+# -------------------------------------------------
+*.log
+*.pid
+*.tmp
+
+# -------------------------------------------------
+# Editor / IDE
+# -------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# -------------------------------------------------
+# OS specific
+# -------------------------------------------------
+.DS_Store
+Thumbs.db
+
+# -------------------------------------------------
+# Optional: build directories
+# -------------------------------------------------
+bin/
+dist/
+build/
