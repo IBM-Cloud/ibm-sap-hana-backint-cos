@@ -6,21 +6,21 @@ repos:
     hooks:
       - id: go-fmt
         name: go fmt
-        entry: bash -c "cd src && go fmt ./..."
+        entry: bash -c "cd utils && go fmt ./..."
         language: system
         pass_filenames: false
         types: [go]
 
       - id: go-imports
         name: go imports
-        entry: bash -c "cd src && goimports -w ."
+        entry: bash -c "cd utils && goimports -w ."
         language: system
         pass_filenames: false
         types: [go]
 
       - id: go-vet
         name: go vet
-        entry: bash -c "cd src && go vet ./..."
+        entry: bash -c "cd utils && go vet ./..."
         language: system
         pass_filenames: false
         types: [go]
@@ -32,7 +32,7 @@ repos:
     rev: v1.62.0
     hooks:
       - id: golangci-lint
-        entry: bash -c "cd src && golangci-lint run ./..."
+        entry: bash -c "cd utils && golangci-lint run ./..."
         language: system
         pass_filenames: false
         always_run: true
