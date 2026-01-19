@@ -115,7 +115,7 @@ SAP HANA, Backint, IBM, Cloud Object Storage, Backup and Recovery, Power Virtual
 
 ### Key Prefixes
 
-Assuming starting a backup using the following command: 
+Assuming starting a backup using the following command:
 
 ````
 BACKUP DATA FOR <dbname> USING BACKINT ('/usr/sap/<sid>/SYS/global/hdb/backint/DB_<dbname>/<identifier>)
@@ -161,9 +161,9 @@ Then the final storage key will be:
 `myDB/DB_<dbname>/<identifier>_databackup<post_fix>`
 
 
-### Validate the hdbbackint configuration file 
+### Validate the hdbbackint configuration file
 
-The configuration file of the `hdbbackint` agent can be validated by executing the following command: 
+The configuration file of the `hdbbackint` agent can be validated by executing the following command:
 
 ```
 hdbbackint -p <hdbbackint_configuration_file> -check
@@ -219,10 +219,10 @@ The value of the **data_backup_buffer_size** parameter should be set based on th
 #### HANA & Backint Agent Recommended Parameter Combination
 This section lists recommended combinations of:
 
-* **HANA parameter:** 
+* **HANA parameter:**
 
    **parallel_data_backup_backint_channels** defines how many Backint channels SAP HANA starts in parallel during a data backup.
-* **Backint Agent parameter:** 
+* **Backint Agent parameter:**
 
    **max_concurrency** controls the maximum number of parallel processing threads used by the `hdbbackint` agent.
 
