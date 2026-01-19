@@ -25,6 +25,13 @@ repos:
         pass_filenames: false
         types: [go]
 
+      - id: install-gosec
+        name: Install gosec if missing
+        entry: bash -c 'command -v gosec >/dev/null 2>&1 || go install github.com/securego/gosec/v2/cmd/gosec@latest'
+        language: system
+        pass_filenames: false
+        always_run: true
+
   # ------------------------
   # GolangCI-Lint (aggregated linters)
   # ------------------------
