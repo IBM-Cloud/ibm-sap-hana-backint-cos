@@ -7,7 +7,7 @@
   Use this flag to verify configuration correctness before running backups or restores.
 
 * **Flexible Multipart Chunk Size Units**
-  The `multipart_chunksize` parameter now supports multiple units — specify sizes in **KB**, **MB**, **GB** not case sensitive or as plain integers for greater flexibility and clarity.
+  The `multipart_chunksize` parameter now supports multiple units — specify sizes in **KB**, **MB**, **GB** (not case sensitive) or as plain integers for greater flexibility and clarity.
 
 
 ## **Fixes & Improvements**
