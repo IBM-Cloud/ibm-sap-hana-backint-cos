@@ -149,9 +149,13 @@ func writeBackintConfiguration(logger *logrus.Logger) {
 	logger.Info("Using backint configuration settings: ")
 	logger.Info("=================================================================")
 	for key, value := range config.BackintConfig {
-		if key == "apikey" || key == "timeout_microsecond" {
-			// Don't print the apikey value
-			// and the timeout to log file
+		if key == "timeout_microsecond" {
+			// Don't print the timeout to log file
+			continue
+		}
+		if key == "apikey" {
+			// Don't print the timeout to log file
+			logger.Info(key + " = ****")
 			continue
 		}
 		logger.Info(key + " = " + value)
