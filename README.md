@@ -55,44 +55,44 @@ SAP HANA, Backint, IBM, Cloud Object Storage, Backup and Recovery, Power Virtual
 
    The extracted package contains
 
-   * hdbackint: The IBM Backint agent **executable** for SAP HANA.
-   * sample_hdbbackint.cfg: A **sample configuration** file for IBM SAP HANA backint agent.
-   * Readme.pdf: Agent **manual**
+   * `hdbbackint`: The IBM Backint agent **executable** for SAP HANA.
+   * `sample_hdbbackint.cfg`: A **sample configuration** file for IBM SAP HANA backint agent.
+   * `Readme.pdf`: Agent **manual**
 
 
 3. **Create Symbolic Links**
 
-SAP HANA expects the Backint agent executable (hdbbackint) to be in the following path:
+   SAP HANA expects the `hdbbackint` executable to be in the following path:
 
-`/usr/sap/<SID>/SYS/global/hdb/opt/hdbbackint`
+   `/usr/sap/<SID>/SYS/global/hdb/opt/hdbbackint`
 
-   * Option 1: Copy the hdbbackint executable to the path `/usr/sap/<SID>/SYS/global/hdb/opt/`
-   * Option 2: Create a symbolic link that points from `/usr/sap/<SID>/SYS/global/hdb/opt/hdbbackint` to the "hdbbackint" executable that was extracted from the package.
-
-
-4. **Configure the IBM Backint agent for SAP HANA with IBM Cloud Object Storage**
-
-The IBM Backint agent for SAP HANA with IBM Cloud Object Storage requires a parameter file in the INI file format.
-
-An example parameter file (sample_hdbbackint.cfg) is found in the extracted package attached to this SAP Note.
-
-You can use this example file, or create a new configuration file.
-
-Place the configuration file in a directory that has the permissions to allow SAP HANA to access it, preferably in path `/usr/sap/<SID>/SYS/global/hdb/opt/` where the executable exists.
+   * Option 1: Copy the `hdbbackint` executable to the path `/usr/sap/<SID>/SYS/global/hdb/opt/`
+   * Option 2: Create a symbolic link that points from `/usr/sap/<SID>/SYS/global/hdb/opt/hdbbackint` to the `hdbbackint` executable that was extracted from the package.
 
 
+## Configure the IBM Backint agent for SAP HANA with IBM Cloud Object Storage
 
-The configuration file consists of the following sections:
+   The IBM Backint agent for SAP HANA with IBM Cloud Object Storage requires a parameter file in the INI file format.
+
+   An example parameter file `sample_hdbbackint.cfg` is part of the release package.
+
+   You can use this example file, or create a new configuration file.
+
+   Place the configuration file in a directory that has the permissions to allow SAP HANA to access it, preferably in path `/usr/sap/<SID>/SYS/global/hdb/opt/` where the executable exists.
+
+
+
+   The configuration file consists of the following sections:
 
    * cloud_storage (mandatory)
    * backint (optional)
    * objects (optional)
    * trace (optional)
 
-To make sure that the _backint_ tool runs without errors, first the configuration file is validated. **Defaults** are set if these parameters are not defined in the file. The process **does not run** if configuration file is **not specified**.
+   To make sure that the `hdbbackint` agent runs without errors, first the configuration file is validated. Defaults are set if these parameters are not defined in the file. The configuration file is mandatory to execute the `hdbbackint` agent.
 
 
-The configuration file consists of the following sections which contain key-value pair settings:
+   The configuration file consists of the following sections which contain key-value pair settings:
 
 
 | Section       | Key                           | Possible Values                                                                            |           | Description                                                                                                                                                                                                                                                                                                                      |
@@ -113,89 +113,101 @@ The configuration file consists of the following sections which contain key-valu
 |               | multipart_chunksize           | <size_in_bytes> or `<size><unit>`, while `<unit>` can be one of the following: KB, MB or GB (not case sensitive), and `<size>` must not be 0.                                                                      | Optional  | Data transfer chunk size. This value should be configured based on system resources.  **Default**: 134000000                                                                                                                                                                                                                     |
 | trace         | agent_log_level               | debug, info, warning, error,critical, http                                                                | Optional  | Trace level for the IBM SAP HANA Backint Agent for IBM Cloud Object Storage.  **Default**: info                                                                                                                                                                                                                                  |
 
-**Key Prefixes**
+### Key Prefixes
+
+Assuming starting a backup using the following command:
+
+````
+BACKUP DATA FOR <dbname> USING BACKINT ('/usr/sap/<sid>/SYS/global/hdb/backint/DB_<dbname>/<identifier>)
+````
+
+By default, the `hdbbackint` agent uses the whole backup name `/usr/sap/<sid>/SYS/global/hdb/backint/DB_<dbname>/<identifier>_databackup<post_fix>` as the storage key for backups.
+
+To manipulate the storage keys, `hdbbackint` provides two parameters which can be defined in the `hdbbackint.cfg` file.
 
 **remove_key_prefix**
 
-Backint uses the whole pipe name as the storage key for backups.
+The value of the key _remove_key_prefix_ specifies a string which will be removed from the beginning of the storage key name.
 
-For example, the key is in the following format by default:
+For example the following setting
 
-`/usr/sap/<sid>/SYS/global/hdb/backint/DB_<dbname>/<prefix>_databackup_2_1`
+```
+remove_key_prefix = /usr/sap/<sid>/SYS/global/hdb/backint/
+```
 
-You can specify a string to be removed from the resulting storage key.
-
-For example:
-
-remove_key_prefix = `/usr/sap/<sid>/SYS/global/hdb/backint/`
-
-will result in a shorter storage key -> `DB_<dbname>/<prefix>_databackup_2`
-
-
+will result in the shorter storage key: `DB_<dbname>/<identifier>_databackup<post_fix>`
 
 **additional_key_prefix**
 
-It is also possible to add prefixes to the storage keys.
+The value of the key _additional_key_prefix_ specifies a string which will be added to the beginning of the storage key name.
 
 For example:
 
+```
 additional_key_prefix = myDB/
+````
 
-will prepend 'myDB/' to the resulting storage key.
+will prepend `myDB/` to the resulting storage key.
 
 For example, if the following options are used together:
 
-remove_key_prefix = `/usr/sap/<sid>/SYS/global/hdb/backint/`
-
+```
+remove_key_prefix = /usr/sap/<sid>/SYS/global/hdb/backint/
 additional_key_prefix = myDB/
+````
 
 Then the final storage key will be:
 
-`myDB/DB_<dbname>/<prefix>_databackup_2`
+`myDB/DB_<dbname>/<identifier>_databackup<post_fix>`
 
 
-5. **Configuring SAP HANA database to use the Parameter File**
+### Validate the hdbbackint configuration file
 
-SAP HANA database uses the following parameters to configure the usage of the parameter file (hdbbackint.cfg).
+The configuration file of the `hdbbackint` agent can be validated by executing the following command:
 
-**After updating the entries it is important to run the "hdbnsutil -reconfig" command as SID user for the changes to take effect.**
+```
+hdbbackint -p <hdbbackint_configuration_file> -check
+```
 
-The following parameters in the "global.ini/backup" section should be set to the path of the "hdbbackint.cfg" file:
 
-   * **data_backup_parameter_file**
+## Configure SAP HANA database to use the parameter File
 
-      For data backups.
+SAP HANA database uses the following parameters to configure the usage of the configuration file `hdbbackint.cfg`. These parameters are set in the `backup` section of the `global.ini` file. This file is located in `/usr/sap/<SAPSID>/SYS/global/hdb/custom/config/`.
 
-      Must be configured.
-   * **log_backup_parameter_file**
+```
+[backup]
+data_backup_parameter_file = <path_to_hdbbackint.cfg>
+log_backup_parameter_file = <path_to_hdbbackint.cfg>
+catalog_backup_parameter_file =< path_to_hdbbackint.cfg>
+catalog_backup_using_backint = true
+log_backup_using_backint = true
+parallel_data_backup_backint_channels = 8
+data_backup_buffer_size = 1024
+parallel_data_backup_backint_size_threshold = 400
+backint_response_timeout = 1800
+```
 
-      If log backups are written using Backint, this parameter must be configured.
-   * **catalog_backup_parameter_file**
+* **data_backup_parameter_file**
 
-      If catalog backups are done using Backint, this parameter must be configured.
-   * **parallel_data_backup_backint_channels**
+   Mandatory. Used or data backups.
 
-      Specify the number of channels to be used for multistreaming.
+* **log_backup_parameter_file**
 
-   ```
-      [backup]
-      data_backup_parameter_file = <path_to_hdbbackint.cfg>
-      log_backup_parameter_file = <path_to_hdbbackint.cfg>
-      catalog_backup_parameter_file =< path_to_hdbbackint.cfg>
-      catalog_backup_using_backint = true
-      log_backup_using_backint = true
-      parallel_data_backup_backint_channels = 8
-      data_backup_buffer_size = 1024
-      parallel_data_backup_backint_size_threshold = 400
-      backint_response_timeout = 1800
-   ```
+   If log backups are written using Backint, this parameter must be configured.
 
-**Once the global.ini file is updated run "hdbnsutil -reconfig" as a SID user for changes in SAP HANA database to take effect.**
+* **catalog_backup_parameter_file**
 
-6. **Recommended Configuration Parameters**
+   If catalog backups are done using Backint, this parameter must be configured.
 
-**data_backup_buffer_size**
-- The value of the `data_backup_buffer_size` parameter should be set based on the total memory available on the VM. The following sizes are recommended:
+* **parallel_data_backup_backint_channels**
+
+   Specify the number of channels to be used for multistreaming.
+
+**Caution: After updating the entries it is important to run the `hdbnsutil -reconfig` command as sidadm user for the changes to take effect.**
+
+### Recommended Configuration Parameters
+
+The value of the **data_backup_buffer_size** parameter should be set based on the total memory available on the VM. The following sizes are recommended:
 
 | System Memory     | Recommended data_backup_buffer_size |
 | ------------------| ------------------------------------|
@@ -204,11 +216,15 @@ The following parameters in the "global.ini/backup" section should be set to the
 | ≥ 6 TB and < 24TB | 4096                                |
 | ≥ 24 TB           | 4096                                |
 
-**HANA & Agent Recommended Parameter Combination**
+#### HANA & Backint Agent Recommended Parameter Combination
 This section lists recommended combinations of:
 
-* **HANA parameter:** parallel_data_backup_backint_channels defines how many Backint channels SAP HANA starts in parallel during a data backup.
-* **Agent parameter:** max_concurrency controls the maximum number of parallel processing threads used by the backup agent.
+* **HANA parameter:**
+
+   **parallel_data_backup_backint_channels** defines how many Backint channels SAP HANA starts in parallel during a data backup.
+* **Backint Agent parameter:**
+
+   **max_concurrency** controls the maximum number of parallel processing threads used by the `hdbbackint` agent.
 
 These combinations help ensure optimal backup throughput and resource utilization.
 
@@ -220,4 +236,4 @@ These combinations help ensure optimal backup throughput and resource utilizatio
 | 4                                                      | 4                                 |
 | 4                                                      | 2                                 |
 
-Note: Values above these combinations generally do not provide further performance improvements and may lead to resource bottlenecks.
+**Note: Values above these combinations generally do not provide further performance improvements and may lead to resource bottlenecks.**
