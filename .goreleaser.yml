@@ -24,7 +24,7 @@ archives:
       - LICENSE
       - README.md
       - CHANGELOG.md
-      - sample_backint.cfg
+      - sample_hdbbackint.cfg
 
 checksum:
   name_template: "{{ .ProjectName }}_{{ .Version }}_SHA256SUMS"
