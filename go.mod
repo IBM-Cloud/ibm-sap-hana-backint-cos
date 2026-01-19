@@ -5,7 +5,6 @@ go 1.24.1
 require (
 	github.com/IBM/ibm-cos-sdk-go v1.13.0
 	github.com/bigkevmcd/go-configparser v0.0.0-20251110123434-de62ed489b4f
-	github.com/klauspost/compress v1.18.2
 	github.com/sirupsen/logrus v1.9.4
 	golang.org/x/net v0.49.0
 	golang.org/x/sys v0.40.0

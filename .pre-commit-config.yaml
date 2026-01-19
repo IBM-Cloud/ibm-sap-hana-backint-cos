@@ -25,6 +25,13 @@ repos:
         pass_filenames: false
         types: [go]
 
+      - id: install-gosec
+        name: Install gosec if missing
+        entry: bash -c 'command -v gosec >/dev/null 2>&1 || go install github.com/securego/gosec/v2/cmd/gosec@latest'
+        language: system
+        pass_filenames: false
+        always_run: true
+
   # ------------------------
   # GolangCI-Lint (aggregated linters)
   # ------------------------
@@ -37,7 +44,38 @@ repos:
         pass_filenames: false
         always_run: true
         types: [go]
-
+  - repo: https://github.com/TekWizely/pre-commit-golang
+    rev: v1.0.0-rc.4
+    hooks:
+      - id: go-sec-repo-mod
+        name: Go Security Checker
+        args:
+          - -severity
+          - high
+          - -confidence
+          - medium
+          - -fmt
+          - text
+          - -tests
+  - repo: https://github.com/syntaqx/git-hooks
+    rev: v0.0.18
+    hooks:
+      - id: forbid-binary
+        exclude: .png|.jpg|.pdf|.sdumodel|.tar.gz
+      - id: shellcheck
+      - id: go-fmt
+  - repo: https://github.com/ibm/detect-secrets
+    rev: 0.13.1+ibm.64.dss
+    hooks:
+      - id: detect-secrets
+        args:
+          [
+            "--baseline",
+            ".secrets.baseline",
+            "--fail-on-unaudited",
+            "--use-all-plugins",
+          ]
+        exclude: go.sum
   # ------------------------
   # General Code Hygiene
   # ------------------------
