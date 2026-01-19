@@ -21,8 +21,6 @@ import (
 
 	"strings"
 	"time"
-
-	"github.com/klauspost/compress/zstd"
 )
 
 /*
@@ -91,19 +89,6 @@ func (b BackintConfigT) Compression() bool {
 
 func (b BackintConfigT) CompressionString() string {
 	return b.Get("compression")
-}
-
-/*
-Getting the compression level
-*/
-func (b BackintConfigT) CompressionLevel() zstd.EncoderLevel {
-	zstdCompressionLevels := [4]zstd.EncoderLevel{
-		zstd.SpeedFastest,
-		zstd.SpeedDefault,
-		zstd.SpeedBetterCompression,
-		zstd.SpeedBestCompression}
-	index := global.ToInteger(b.Get("compression_level")) - 1
-	return zstdCompressionLevels[index]
 }
 
 /*

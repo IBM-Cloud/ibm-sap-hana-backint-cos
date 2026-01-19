@@ -1,0 +1,206 @@
+version: 1
+allowedLicenses:
+- Apache-2.0
+- BSD-2-Clause
+- BSD-3-Clause
+- ISC
+- MIT
+deniedLicenses:
+- AGPL-3.0
+- GPL-3.0
+overrides: []
+
+schemaVersion: oss-license-declaration.cloud.ibm.com:v4
+name: ibm-sap-hana-backint-cos
+source: https://github.com/IBM-Cloud/ibm-sap-hana-backint-cos
+issues: https://github.com/IBM-Cloud/ibm-sap-hana-backint-cos/issues
+objectCodeOnly: false
+additionalDownloads:
+  include:
+  - go modules
+  exclude:
+  - name: glide
+    documentation: Package manager not invoked in build nor runtime use
+  - name: nodejs
+    documentation: Package manager not invoked in build nor runtime use
+  - name: yarn
+    documentation: Package manager not invoked in build nor runtime use
+dependencies:
+  - name: github.com/IBM/go-sdk-core
+    version: v5.21.2
+    licenses:
+      - Apache-2.0
+  - name: github.com/IBM/ibm-cos-sdk-go
+    version: v1.13.0
+    licenses:
+      - Apache-2.0
+  - name: github.com/bigkevmcd/go-configparser
+    version: v0.0.0-20251110123434-de62ed489b4f
+    licenses:
+      - MIT
+  - name: github.com/davecgh/go-spew
+    version: v1.1.1
+    licenses:
+      - ISC
+  - name: github.com/fatih/color
+    version: v1.16.0
+    licenses:
+      - MIT
+  - name: github.com/fsnotify/fsnotify
+    version: v1.6.0
+    licenses:
+      - BSD-3-Clause
+  - name: github.com/gabriel-vasile/mimetype
+    version: v1.4.11
+    licenses:
+      - MIT
+  - name: github.com/go-openapi/errors
+    version: v0.22.4
+    licenses:
+      - Apache-2.0
+  - name: github.com/go-openapi/strfmt
+    version: v0.25.0
+    licenses:
+      - Apache-2.0
+  - name: github.com/go-openapi/testify/v2
+    version: v2.0.2
+    licenses:
+      - Apache-2.0
+  - name: github.com/go-playground/assert/v2
+    version: v2.2.0
+    licenses:
+      - MIT
+  - name: github.com/go-playground/locales
+    version: v0.14.1
+    licenses:
+      - MIT
+  - name: github.com/go-playground/universal-translator
+    version: v0.18.1
+    licenses:
+      - MIT
+  - name: github.com/go-playground/validator/v10
+    version: v10.28.0
+    licenses:
+      - MIT
+  - name: github.com/go-viper/mapstructure/v2
+    version: v2.4.0
+    licenses:
+      - MIT
+  - name: github.com/google/go-cmp
+    version: v0.7.0
+    licenses:
+      - BSD-3-Clause
+  - name: github.com/google/uuid
+    version: v1.6.0
+    licenses:
+      - BSD-3-Clause
+  - name: github.com/hashicorp/go-cleanhttp
+    version: v0.5.2
+    licenses:
+      - MPL-2.0
+  - name: github.com/hashicorp/go-hclog
+    version: v1.6.3
+    licenses:
+      - MIT
+  - name: github.com/hashicorp/go-retryablehttp
+    version: v0.7.8
+    licenses:
+      - MPL-2.0
+  - name: github.com/jmespath/go-jmespath
+    version: v0.4.0
+    licenses:
+      - Apache-2.0
+  - name: github.com/jmespath/go-jmespath/internal/testify
+    version: v1.5.1
+    licenses:
+      - Apache-2.0
+  - name: github.com/kr/pretty
+    version: v0.2.1
+    licenses:
+      - MIT
+  - name: github.com/kr/text
+    version: v0.1.0
+    licenses:
+      - MIT
+  - name: github.com/leodido/go-urn
+    version: v1.4.0
+    licenses:
+      - MIT
+  - name: github.com/mattn/go-colorable
+    version: v0.1.13
+    licenses:
+      - MIT
+  - name: github.com/mattn/go-isatty
+    version: v0.0.20
+    licenses:
+      - MIT
+  - name: github.com/nxadm/tail
+    version: v1.4.8
+    licenses:
+      - MIT
+  - name: github.com/oklog/ulid
+    version: v1.3.1
+    licenses:
+      - Apache-2.0
+  - name: github.com/onsi/ginkgo
+    version: v1.16.5
+    licenses:
+      - MIT
+  - name: github.com/onsi/gomega
+    version: v1.37.0
+    licenses:
+      - MIT
+  - name: github.com/sirupsen/logrus
+    version: v1.9.4
+    licenses:
+      - MIT
+  - name: github.com/stretchr/testify
+    version: v1.11.1
+    licenses:
+      - MIT
+  - name: go.mongodb.org/mongo-driver
+    version: v1.17.6
+    licenses:
+      - Apache-2.0
+  - name: go.yaml.in/yaml/v2
+    version: v2.4.3
+    licenses:
+      - Apache-2.0
+  - name: golang.org/x/crypto
+    version: v0.47.0
+    licenses:
+      - BSD-3-Clause
+  - name: golang.org/x/net
+    version: v0.49.0
+    licenses:
+      - BSD-3-Clause
+  - name: golang.org/x/sys
+    version: v0.40.0
+    licenses:
+      - BSD-3-Clause
+  - name: golang.org/x/text
+    version: v0.33.0
+    licenses:
+      - BSD-3-Clause
+  - name: gopkg.in/check.v1
+    version: v1.0.0-20201130134442-10cb98267c6c
+    licenses:
+      - BSD-2-Clause
+  - name: gopkg.in/tomb.v1
+    version: v1.0.0-20141024135613-dd632973f1e7
+    licenses:
+      - BSD-3-Clause
+  - name: gopkg.in/yaml.v2
+    version: v2.4.0
+    licenses:
+      - Apache-2.0
+  - name: gopkg.in/yaml.v3
+    version: v3.0.1
+    licenses:
+      - MIT
+      - Apache-2.0
+  - name: sigs.k8s.io/yaml
+    version: v1.6.0
+    licenses:
+      - MIT
+   
