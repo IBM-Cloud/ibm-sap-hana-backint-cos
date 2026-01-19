@@ -12,5 +12,5 @@
 
 ## **Fixes & Improvements**
 
-* Improved error handling for `hdbbackint.cfg`
+* Improved error handling for `hdbbackint.cfg`.
   The agent no longer crashes when encountering invalid configuration content. Instead, detailed error messages are displayed to help identify and correct the issue quickly.
