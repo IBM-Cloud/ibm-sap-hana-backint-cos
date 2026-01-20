@@ -155,7 +155,7 @@ func writeBackintConfiguration(logger *logrus.Logger) {
 			continue
 		}
 		if key == "apikey" {
-			// Don't print the timeout to log file
+			// Don't print the apikey to log file
 			logger.Info(key + " = ****")
 			continue
 		}
