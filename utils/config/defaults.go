@@ -70,22 +70,6 @@ var region = Default{
 /*
 backint Section
 */
-var compression = Default{
-	key:            "compression",
-	section:        SECTION_BACKINT,
-	defaultValue:   "False",
-	mandatory:      false,
-	validationType: CONFIG_BOOL}
-
-var compression_level = Default{
-	key:            "compression_level",
-	section:        SECTION_BACKINT,
-	defaultValue:   "0",
-	min:            1,
-	max:            4,
-	mandatory:      false,
-	validationType: CONFIG_RANGE}
-
 var max_concurrency = Default{
 	key:            "max_concurrency",
 	section:        SECTION_BACKINT,
@@ -181,8 +165,6 @@ var configDefaults = []Default{
 	ibm_auth_endpoint,
 	max_concurrency,
 	multipart_chunksize,
-	compression,
-	compression_level,
 	remove_key_prefix,
 	additional_key_prefix,
 	object_tags,

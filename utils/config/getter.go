@@ -81,17 +81,6 @@ func (b BackintConfigT) BucketName() string {
 }
 
 /*
-Checking if compression is set
-*/
-func (b BackintConfigT) Compression() bool {
-	return strings.ToUpper(b.CompressionString()) == "TRUE"
-}
-
-func (b BackintConfigT) CompressionString() string {
-	return b.Get("compression")
-}
-
-/*
 Getting the endpoint url
 */
 func (b BackintConfigT) EndpointUrl() string {

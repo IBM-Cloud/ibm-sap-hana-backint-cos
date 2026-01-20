@@ -22,6 +22,7 @@ import (
 
 	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/config"
 	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/global"
+	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/version"
 
 	"github.com/sirupsen/logrus"
 )
@@ -72,7 +73,7 @@ func SetupLogging() *logrus.Logger {
 	logger := generateLogger()
 	logger.Info(fmt.Sprintf(
 		"Running hdbbackint with %s.",
-		global.TOOL_VERSION),
+		version.TOOL_VERSION),
 	)
 	return logger
 }

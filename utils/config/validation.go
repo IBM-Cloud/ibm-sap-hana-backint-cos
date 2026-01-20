@@ -239,10 +239,9 @@ func (cp Default) validateParameter() {
 
 /*
 Validating special settings:
-compressing and lock retention belong to more than one parameter
+lock retention belong to more than one parameter
 */
 func validateSpecial(basicConfig []Default) {
-	validateCompression(basicConfig)
 	validateLockRetention(basicConfig)
 }
 
@@ -490,27 +489,6 @@ func (cp Default) validateUrl() {
 
 /*
 Special validation:
-Validating compression
-*/
-func validateCompression(basicConfig []Default) {
-	if isCompression(basicConfig) {
-		if !isCompressionLevelSpecified(basicConfig) {
-			// compression level missing
-			message := "ERROR: You specified compression = true,"
-			message += " but no compression level is set."
-			Default{}.addInvalidValueMsg(message)
-		}
-	} else {
-		if isCompressionLevelSpecified(basicConfig) {
-			message := "ERROR: You specified compression = false,"
-			message += " but compression level is set."
-			Default{}.addInvalidValueMsg(message)
-		}
-	}
-}
-
-/*
-Special validation:
 Validating object lock retention
 */
 func validateLockRetention(basicConfig []Default) {
@@ -536,26 +514,6 @@ returns true if config value is of type boolean
 func (cp Default) isBool() bool {
 	_, err := strconv.ParseBool(cp.configValue)
 	return err == nil
-}
-
-/*
-Returns true if compression is set
-*/
-func isCompression(basicConfig []Default) bool {
-	b := getObjForKey(basicConfig, "compression")
-	return strings.ToUpper(b.configValue) == "TRUE"
-}
-
-/*
-Returns true if a compression_level is specified
-*/
-func isCompressionLevelSpecified(basicConfig []Default) bool {
-	b := getObjForKey(basicConfig, "compression_level")
-	if b.configValue == "" {
-		return false
-	}
-	configValue, _ := strconv.Atoi(b.configValue)
-	return isValueInRange(configValue, b.min, b.max)
 }
 
 /*

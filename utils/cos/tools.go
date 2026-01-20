@@ -35,28 +35,10 @@ import (
 Reader function for uploading data
 */
 func (r *backintReader) Read(p []byte) (int, error) {
-	// if r.compress {
-	// 	global.Logger.Debug("compress")
-	// 	readFromPipe, err := r.r.Read(global.Compress(p))
-	// 	global.Logger.Debug(fmt.Sprintf("Read from pipe: %d", len(p)))
-	// 	global.Logger.Debug(fmt.Sprintf("Compressed: %d", readFromPipe))
-	// 	r.noOfbytes += int64(readFromPipe)
-	// 	return readFromPipe, err
-	// } else {
 	readFromPipe, err := r.r.Read(p)
 	r.noOfbytes += int64(readFromPipe)
 	return readFromPipe, err
 	// }
-}
-
-/*
-Setting METADATA information
-*/
-func setMetaData() map[string]*string {
-	metadata := make(map[string]*string)
-	cmp := config.BackintConfig.CompressionString()
-	metadata[global.METADATA_COMPRESSION_LABEL] = &cmp
-	return metadata
 }
 
 /*
@@ -74,12 +56,9 @@ func setupUploadInputInfo(
 		global.FAILURE,
 	)
 
-	// TODO compression -> Issue #7
 	readerFromPipe := backintReader{
 		r:         rPipe,
 		noOfbytes: 0,
-		// compress:  backintConfig.compression(),
-		compress: false,
 	}
 
 	tags := config.BackintConfig.Tags()
@@ -101,7 +80,6 @@ func setupUploadInputInfo(
 		ObjectLockMode:            pLockMode,
 		ObjectLockRetainUntilDate: pLockDate,
 		Tagging:                   &tags,
-		Metadata:                  setMetaData(),
 	}
 
 	return input, &readerFromPipe

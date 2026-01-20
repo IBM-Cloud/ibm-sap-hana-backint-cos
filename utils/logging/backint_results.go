@@ -18,6 +18,7 @@ import (
 	"fmt"
 
 	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/global"
+	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/version"
 )
 
 /*
@@ -28,8 +29,8 @@ func InitializeBackintResultMessages() BackintResultMessages {
 	message := fmt.Sprintf(
 		"#%s \"%s\" \"%s\"",
 		"SOFTWAREID",
-		global.BACKINT_VERSION,
-		global.TOOL_VERSION,
+		version.BACKINT_VERSION,
+		version.TOOL_VERSION,
 	)
 	b = append(b, message)
 	return b
@@ -89,22 +90,6 @@ func (b *BackintResultMessages) AddBackupMetrics(
 		sourceSize,
 		targetSize,
 		duration,
-	)
-	b.addComments([]string{comment})
-}
-
-/*
-Adding the compressed info comment for BACKUP
-*/
-func (b *BackintResultMessages) AddBackupCompressedInfo(
-	sourceSize int64,
-	targetSize int64,
-) {
-	comment := fmt.Sprintf(
-		"compressed backup: original size: %s, compressed size: %s, factor: %.2f",
-		printableSize(sourceSize),
-		printableSize(targetSize),
-		float32(sourceSize/targetSize),
 	)
 	b.addComments([]string{comment})
 }
