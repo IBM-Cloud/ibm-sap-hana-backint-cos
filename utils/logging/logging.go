@@ -55,13 +55,14 @@ func GetLogFile() *os.File {
 	global.LogFile, err = os.OpenFile(
 		global.Args.OutputFile,
 		os.O_APPEND|os.O_WRONLY|os.O_CREATE,
-		0666,
+		0600,
 	)
 	if err != nil {
 		fmt.Printf(
 			"Could not open logfile '%s' for writing.",
 			global.Args.OutputFile,
 		)
+		os.Exit(1)
 	}
 	return global.LogFile
 }
@@ -109,7 +110,6 @@ func generateLogger() *logrus.Logger {
 Getting the loglevel from the given loglevel config parameter
 */
 func getLogLevel() logrus.Level {
-	fmt.Printf("Loglevel: %s", config.BackintConfig.AgentLogLevelU())
 	switch config.BackintConfig.AgentLogLevelU() {
 	case "INFO":
 		return logrus.InfoLevel

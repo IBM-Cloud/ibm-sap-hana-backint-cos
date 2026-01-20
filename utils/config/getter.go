@@ -62,7 +62,7 @@ func (b BackintConfigT) Apikey() string {
 /*
 Getting the path to the apikey file
 */
-func (b BackintConfigT) authKeypath() string {
+func (b BackintConfigT) AuthKeypath() string {
 	return b.Get("auth_keypath")
 }
 
