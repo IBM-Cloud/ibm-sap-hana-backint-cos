@@ -62,7 +62,7 @@ func (b BackintConfigT) Apikey() string {
 /*
 Getting the path to the apikey file
 */
-func (b BackintConfigT) authKeypath() string {
+func (b BackintConfigT) AuthKeypath() string {
 	return b.Get("auth_keypath")
 }
 
@@ -78,17 +78,6 @@ Getting the bucket name
 */
 func (b BackintConfigT) BucketName() string {
 	return b.Get("bucket")
-}
-
-/*
-Checking if compression is set
-*/
-func (b BackintConfigT) Compression() bool {
-	return strings.ToUpper(b.CompressionString()) == "TRUE"
-}
-
-func (b BackintConfigT) CompressionString() string {
-	return b.Get("compression")
 }
 
 /*

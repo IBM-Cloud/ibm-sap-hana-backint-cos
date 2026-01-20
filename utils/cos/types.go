@@ -85,5 +85,4 @@ type ByteMap map[int64][]byte
 type backintReader struct {
 	r         io.Reader
 	noOfbytes int64
-	compress  bool
 }

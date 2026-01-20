@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/global"
+	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/version"
 )
 
 /*
@@ -97,8 +98,8 @@ Printing out the version
 */
 func PrintVersion() {
 	fmt.Printf("\"%s\" \"%s\" \n",
-		global.BACKINT_VERSION,
-		global.TOOL_VERSION,
+		version.BACKINT_VERSION,
+		version.TOOL_VERSION,
 	)
 }
 

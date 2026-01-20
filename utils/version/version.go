@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License
 
-package backint
+package version
 
-// Maximum number of allowed tags
-const MAX_NUMBER_OF_TAGS int = 10
-
-// Values for comparison with parameter file settings
-const OBJECTLOCKMODE string = "COMPLIANCE"
+// Versions
+const (
+	BACKINT_VERSION = "backint 1.04"
+	TOOL_VERSION    = "Backint for IBM Object Store version: '0.0.4'"
+)

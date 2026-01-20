@@ -14,12 +14,6 @@
 
 package global
 
-// Versions
-const (
-	BACKINT_VERSION = "backint 1.04"
-	TOOL_VERSION    = "Backint for IBM Object Store version: '0.0.3'"
-)
-
 // Function names
 const (
 	BACKUP        = "BACKUP"
@@ -60,9 +54,6 @@ const (
 	FAILURE         = 1
 	WRONG_PARAMETER = 2
 )
-
-// Values for METADATA
-const METADATA_COMPRESSION_LABEL string = "compression"
 
 // Values for comparison with parameter file settings
 const OBJECTLOCKMODE string = "COMPLIANCE"

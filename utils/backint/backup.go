@@ -42,12 +42,6 @@ func Backup(
 		return true
 	}
 
-	// Initializing compression if needed TODO -> Issue #7
-	// if backintConfig.compression() {
-	// 	encoderLevel = zstd.WithEncoderLevel(zstd.SpeedBestCompression)
-	// 	encoder, _ = zstd.NewWriter(nil, encoderLevel)
-	// }
-
 	// Initializing asynchronous processing
 	var wgUpload sync.WaitGroup
 	chanUpload := make(chan cos.Result, len(sourcePaths))
@@ -104,12 +98,6 @@ func backupResultHandler(chanUpload chan cos.Result) bool {
 				result.TargetSize,
 				result.Duration,
 			)
-			if result.TargetSize != result.SourceSize {
-				logging.BackintResultMsgs.AddBackupCompressedInfo(
-					result.SourceSize,
-					result.TargetSize,
-				)
-			}
 		} else {
 			logging.BackintResultMsgs.AddErrorMessage(
 				result.SourcePath,

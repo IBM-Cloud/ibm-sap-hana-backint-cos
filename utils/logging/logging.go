@@ -22,6 +22,7 @@ import (
 
 	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/config"
 	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/global"
+	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/version"
 
 	"github.com/sirupsen/logrus"
 )
@@ -54,13 +55,14 @@ func GetLogFile() *os.File {
 	global.LogFile, err = os.OpenFile(
 		global.Args.OutputFile,
 		os.O_APPEND|os.O_WRONLY|os.O_CREATE,
-		0666,
+		0600,
 	)
 	if err != nil {
 		fmt.Printf(
 			"Could not open logfile '%s' for writing.",
 			global.Args.OutputFile,
 		)
+		os.Exit(1)
 	}
 	return global.LogFile
 }
@@ -72,7 +74,7 @@ func SetupLogging() *logrus.Logger {
 	logger := generateLogger()
 	logger.Info(fmt.Sprintf(
 		"Running hdbbackint with %s.",
-		global.TOOL_VERSION),
+		version.TOOL_VERSION),
 	)
 	return logger
 }
@@ -108,7 +110,6 @@ func generateLogger() *logrus.Logger {
 Getting the loglevel from the given loglevel config parameter
 */
 func getLogLevel() logrus.Level {
-	fmt.Printf("Loglevel: %s", config.BackintConfig.AgentLogLevelU())
 	switch config.BackintConfig.AgentLogLevelU() {
 	case "INFO":
 		return logrus.InfoLevel
@@ -154,7 +155,7 @@ func writeBackintConfiguration(logger *logrus.Logger) {
 			continue
 		}
 		if key == "apikey" {
-			// Don't print the timeout to log file
+			// Don't print the apikey to log file
 			logger.Info(key + " = ****")
 			continue
 		}
