@@ -96,10 +96,7 @@ func readConfigfile(filename string) []ConfigParameter {
 			parmsFromConfig = append(parmsFromConfig, configParm)
 		}
 	}
-
-	validateKeysInSections(parmsFromConfig)
-
-	return parmsFromConfig
+	return validateKeysInSections(parmsFromConfig)
 }
 
 /*
