@@ -87,3 +87,21 @@ repos:
       - id: check-yaml
       - id: check-added-large-files
       - id: mixed-line-ending
+
+  - repo: https://github.com/crate-ci/typos
+    rev: v1.42.0
+    hooks:
+      - id: typos
+        name: typos (warning only)
+        description: "Checks for typos in repo and displays suggestions as warnings but won't block commits. Fix typos manually or add exceptions to ci/.typos.toml file"
+        files: ^.*\.(go|md|json|yaml|yml)$
+        exclude: |
+          (?x)^(
+          .*\.svg|
+          .*\.pdf|
+          go\.sum|
+          go\.mod|
+          \.git/.*
+          )$
+        entry: bash -c 'typos --format=brief "$@" | sed "s/\`//g" || true'
+        verbose: true
