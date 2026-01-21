@@ -24,6 +24,9 @@ import (
 	"github.com/IBM/ibm-cos-sdk-go/service/s3"
 )
 
+/*
+Executing the functions specified as arguments
+*/
 func Execute(function string) bool {
 	_, s3Client := cos.GenerateCOSSession()
 
@@ -56,6 +59,9 @@ func Execute(function string) bool {
 	return true
 }
 
+/*
+Verifying the given bucket
+*/
 func verifyBucket(s3Client *s3.S3, bucket string) bool {
 	success, err := cos.RunBucketExists(s3Client, bucket)
 	if err != nil {
@@ -74,18 +80,22 @@ func verifyBucket(s3Client *s3.S3, bucket string) bool {
 	return success
 }
 
+/*
+Getting the bucket lifecycle settings of the given bucket
+*/
 func getBucketLifeCycle(s3Client *s3.S3, bucket string, fileName string) bool {
 	response, err := cos.RunGetBucketLifecycleRules(s3Client, bucket)
 
 	if err != nil {
+		fmt.Printf("Error discovering bucket lifecycle information: %s\n", err)
 		return false
 	}
 
 	var lines []string
 
 	for _, rule := range response {
-		if *rule.Status == "Enabled" {
-			set, days := getExpirationDays(rule)
+		if *rule.Status == "Enabled" && rule.Expiration != nil {
+			set, days := getExpirationDays(rule.Expiration)
 			if set {
 				lmRule := fmt.Sprintf(
 					"ID:%s;Expiration:%d",
@@ -99,6 +109,9 @@ func getBucketLifeCycle(s3Client *s3.S3, bucket string, fileName string) bool {
 	return writeLinesToFile(fileName, lines)
 }
 
+/*
+Listing all objects of a given bucket
+*/
 func getObjectList(s3Client *s3.S3, bucket string, fileName string) bool {
 	response, err := cos.RunListObjectsOfBucket(s3Client, bucket)
 
@@ -114,6 +127,9 @@ func getObjectList(s3Client *s3.S3, bucket string, fileName string) bool {
 	return writeLinesToFile(fileName, lines)
 }
 
+/*
+Uploading one file to the given bucket
+*/
 func uploadFile(s3Client *s3.S3, bucket string, source string, key string) bool {
 	err := cos.UploadSingleFile(s3Client, bucket, source, key)
 	if err != nil {
@@ -122,21 +138,29 @@ func uploadFile(s3Client *s3.S3, bucket string, source string, key string) bool 
 	return err == nil
 }
 
-func getExpirationDays(rule *s3.LifecycleRule) (bool, int64) {
-	if rule.Expiration.ExpiredObjectDeleteMarker != nil {
-		if !*rule.Expiration.ExpiredObjectDeleteMarker {
-			return true, *rule.Expiration.Days
+/*
+Getting the Expiration days of one rule
+*/
+func getExpirationDays(ruleExpiration *s3.LifecycleExpiration) (bool, int64) {
+	if ruleExpiration.ExpiredObjectDeleteMarker != nil {
+		if !*ruleExpiration.ExpiredObjectDeleteMarker {
+			if *ruleExpiration.Days != 0 {
+				return true, *ruleExpiration.Days
+			} else {
+				return false, 0
+			}
 		} else {
 			return false, 0
 		}
 	}
-	return true, *rule.Expiration.Days
+	return true, *ruleExpiration.Days
 }
 
 func writeLinesToFile(fileName string, lines []string) bool {
 
-	f, err := os.OpenFile(fileName, os.O_APPEND|os.O_WRONLY, 0666)
+	f, err := os.OpenFile(fileName, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
+		fmt.Printf("Error opening file %s: %s\n", fileName, err)
 		return false
 	}
 
@@ -147,6 +171,7 @@ func writeLinesToFile(fileName string, lines []string) bool {
 	for _, line := range lines {
 		_, err = fmt.Fprintln(f, line)
 		if err != nil {
+			fmt.Printf("Error writing to file %s: %s\n", fileName, err)
 			return false
 		}
 	}

@@ -132,7 +132,7 @@ func validateSections(sections []string) {
 /*
 Validating if keys are located in the correct sections
 */
-func validateKeysInSections(parms []ConfigParameter) {
+func validateKeysInSections(parms []ConfigParameter) []ConfigParameter {
 	if global.Args.CheckParms {
 		checkParmMessages = append(
 			checkParmMessages,
@@ -190,6 +190,7 @@ func validateKeysInSections(parms []ConfigParameter) {
 			}
 		}
 	}
+	return parms
 }
 
 /*
