@@ -252,6 +252,7 @@ func writeDataToPipe(fifo *os.File, data []byte, nextIndex *int64, pipeBufferSiz
 				fifo.Name(),
 				errors.New("Timeout")),
 			)
+			return false
 		case err := <-written:
 			if err != nil {
 				global.Logger.Error(fmt.Sprintf(
