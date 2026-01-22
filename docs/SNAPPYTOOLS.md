@@ -37,7 +37,7 @@ Required arguments:
 
 Returning a list of all lifecycle rules defined for the given bucket.
 
-The lifecycle rules are written to the file secified for argument `-r`.
+The lifecycle rules are written to the file specified for argument `-r`.
 
 Each line in the response file represents one rule. The output has the format:
 
