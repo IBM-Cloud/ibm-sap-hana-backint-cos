@@ -15,6 +15,7 @@
 package backint
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 
@@ -96,7 +97,13 @@ func Inquire(
 				}
 			}
 		default:
-			// TODO Error -> Issue #21
+			// Wrong keyword specified in input file
+			global.Logger.Error(
+				fmt.Sprintf(
+					"Failure during inquiry. Wrong keyword %s specified in input file.",
+					i.Keyword),
+			)
+			return false
 		}
 	}
 	return true
