@@ -218,7 +218,7 @@ Writing the data to pipe
 Due to hang problems (looks like it is caused by HANA processing itself) the
 data must be splitted into smaller portions so that HANA can process the data.
 The size of the portion is set by config parameter pipe_chunksize_KB.
-In addition, writing to pipe stops after 30 seconds, if not successfull
+In addition, writing to pipe stops after 30 seconds, if not successful
 */
 func writeDataToPipe(fifo *os.File, data []byte, nextIndex *int64, pipeBufferSize int) bool {
 
@@ -245,7 +245,7 @@ func writeDataToPipe(fifo *os.File, data []byte, nextIndex *int64, pipeBufferSiz
 
 		select {
 		case <-ctx.Done():
-			// Timout writing to pipe
+			// Timeout writing to pipe
 			global.Logger.Error(fmt.Sprintf(
 				"Error writing part #%d to pipe '%s': %s",
 				*nextIndex,

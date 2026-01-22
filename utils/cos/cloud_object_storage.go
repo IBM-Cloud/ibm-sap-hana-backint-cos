@@ -77,7 +77,7 @@ func Upload(
 		}
 	} else {
 		global.Logger.Info(fmt.Sprintf(
-			"Sucessfully uploaded '%s' to '%s'.",
+			"Successfully uploaded '%s' to '%s'.",
 			sourcePath,
 			Key),
 		)
