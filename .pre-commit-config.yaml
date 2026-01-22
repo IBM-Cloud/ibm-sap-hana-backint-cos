@@ -103,5 +103,5 @@ repos:
           go\.mod|
           \.git/.*
           )$
-        entry: bash -c 'typos --format=brief "$@" | sed "s/\`//g" || true'
+        entry: bash -c 'typos --format=brief --config=.github/.typos.toml "$@" | sed "s/\`//g" || true'
         verbose: true

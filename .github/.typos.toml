@@ -1,0 +1,9 @@
+[default.extend-words]
+# Words to ignore
+# Format: "word" = "word" (keep as-is)
+
+
+parms = "parms"          # Common shorthand for "parameters" in technical contexts.
+Parm = "Parm"            # Capitalized variant often used in code or documentation.
+Parms = "Parms"          # Plural, capitalized shorthand for "parameters."
+splitted = "splitted"    # Non-standard English but sometimes intentionally used; ignore to prevent false positives.
