@@ -24,7 +24,7 @@ func TestVersion(t *testing.T) {
 }
 
 func TestCheckConfig(t *testing.T) {
-	cfgPath := "../testdata/hdbbackint.cfg"
+	cfgPath := "../testdata/test.cfg"
 
 	cmd := exec.Command(
 		getExecutable(t),
