@@ -18,7 +18,8 @@ jobs:
 
     - name: Build hdbbackint
       run: |
-        go build -o hdbbackint .
+        mkdir -p bin
+        go build -o bin/hdbbackint .
 
     - name: Run tests
       run: |
