@@ -2,11 +2,16 @@ package tests
 
 import (
 	"os/exec"
+	"path/filepath"
 	"testing"
 )
 
+func getExecutable(t *testing.T) string {
+	return filepath.Join("..", "bin", "hdbbackint")
+}
+
 func TestVersion(t *testing.T) {
-	cmd := exec.Command("./hdbbackint", "-v")
+	cmd := exec.Command(getExecutable(t), "-v")
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -22,7 +27,7 @@ func TestCheckConfig(t *testing.T) {
 	cfgPath := "../testdata/hdbbackint.cfg"
 
 	cmd := exec.Command(
-		"./hdbbackint",
+		getExecutable(t),
 		"-p", cfgPath,
 		"-check",
 	)
