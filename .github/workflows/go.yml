@@ -1,62 +1,66 @@
-name: Go
+name: Go CI
 
 permissions:
   contents: read
 
 on:
+  push:
+    branches: [main]
   pull_request:
     branches: [main]
 
+env:
+  GO_VERSION: "^1.24"
+
 jobs:
   pre-commit:
-    name: Pre-commit
+    name: Pre-commit Checks
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v6.0.2
 
-      - name: Set up Go 1.x
+      - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version: ^1.24
+          go-version: ${{ env.GO_VERSION }}
 
-      # Install Go tools required for your pre-commit hooks
-      - name: Install goimports
-        run: go install golang.org/x/tools/cmd/goimports@latest
-
-      - name: Install golangci-lint
+      - name: Install Go tools
         run: |
+          go install golang.org/x/tools/cmd/goimports@latest
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh \
             | sh -s -- -b $(go env GOPATH)/bin v2.6.1
 
-      # Run pre-commit hooks
-      - name: Run pre-commit
+      - name: Run pre-commit hooks
         uses: pre-commit/action@v3.0.1
         with:
           extra_args: --all-files
 
-  build:
-    name: Build
+  build-and-test:
+    name: Build and Test
     runs-on: ubuntu-latest
     needs: pre-commit
 
     steps:
-      - name: Set up Go 1.x
+      - name: Checkout code
+        uses: actions/checkout@v6.0.1
+
+      - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version: ^1.24
+          go-version: ${{ env.GO_VERSION }}
 
       - name: Check out code
         uses: actions/checkout@v6.0.2
 
-      - name: Get dependencies
-        run: |
-          go get -v -t -d ./...
-          if [ -f Gopkg.toml ]; then
-              curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
-              dep ensure
-          fi
+      - name: Download dependencies
+        run: go mod download
 
       - name: Build
-        run: go build -v .
+        run: |
+          mkdir -p bin
+          go build -v -o bin/hdbbackint .
+
+      - name: Run tests
+        run: go test -v -race -coverprofile=coverage.out ./tests/...
