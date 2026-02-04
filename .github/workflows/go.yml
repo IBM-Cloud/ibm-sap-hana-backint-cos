@@ -63,4 +63,6 @@ jobs:
           go build -v -o bin/hdbbackint .
 
       - name: Run tests
+        env:
+          APIKEY: ${{ secrets.APIKEY }}
         run: go test -v -race -coverprofile=coverage.out ./tests/...
