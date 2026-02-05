@@ -42,6 +42,14 @@ func CheckParameters() int {
 	)
 
 	for _, m := range checkParmMessages {
+		// In some cases (unknown key or key in wrong section) the validation during a
+		// hdbbackint agent call does not produce an error. These keys and their values are ignored.
+		// In case of argument -check the agent should return an error.
+		// To prevent side effects regarding the backint functionality we
+		// check here the output of the validation process.
+		if strings.Contains(m, VALIDATION_ERROR) {
+			success = false
+		}
 		fmt.Println(m)
 	}
 
@@ -104,7 +112,7 @@ func validateSections(sections []string) {
 				found = true
 				if global.Args.CheckParms {
 					checkParmMessages = append(checkParmMessages,
-						fmt.Sprintf("\tOK: Section %s is valid.", section),
+						fmt.Sprintf("\t%s: Section %s is valid.", VALIDATION_OK, section),
 					)
 				}
 			}
@@ -112,9 +120,10 @@ func validateSections(sections []string) {
 
 		if !found {
 			errMsg := fmt.Sprintf(
-				"ERROR: You specified the section '%s',"+
+				"%s: You specified the section '%s',"+
 					" but it is not part of the hdbbackint configuration. "+
 					"All parameters specified in this section are ignored.",
+				VALIDATION_ERROR,
 				section,
 			)
 			if global.Args.CheckParms {
@@ -147,9 +156,10 @@ func validateKeysInSections(parms []ConfigParameter) []ConfigParameter {
 			if keyFromFile == d.key {
 				found = true
 				if sectionFromFile != d.section {
-					errMsg := fmt.Sprintf("ERROR: You specified '%s'"+
+					errMsg := fmt.Sprintf("%s: You specified '%s'"+
 						" in section '%s', but key belongs to section %s."+
 						" The value of '%s' will be ignored.",
+						VALIDATION_ERROR,
 						keyFromFile,
 						sectionFromFile,
 						d.section,
@@ -167,7 +177,8 @@ func validateKeysInSections(parms []ConfigParameter) []ConfigParameter {
 						checkParmMessages = append(
 							checkParmMessages,
 							fmt.Sprintf(
-								"\tOK: '%s' specified in correct section",
+								"\t%s: '%s' specified in correct section",
+								VALIDATION_OK,
 								keyFromFile),
 						)
 					}
@@ -176,9 +187,10 @@ func validateKeysInSections(parms []ConfigParameter) []ConfigParameter {
 			}
 		}
 		if !found {
-			errMsg := fmt.Sprintf("ERROR: You specified '%s'"+
+			errMsg := fmt.Sprintf("%s: You specified '%s'"+
 				" in section '%s', but the key is unknown."+
 				" The value of '%s' will be ignored.",
+				VALIDATION_ERROR,
 				keyFromFile,
 				sectionFromFile,
 				keyFromFile,
@@ -221,7 +233,8 @@ func (cp Default) validateMandatory() {
 			if global.Args.CheckParms {
 				checkParmMessages = append(checkParmMessages,
 					fmt.Sprintf(
-						"\tOK: Mandatory parameter '%s' exists.",
+						"\t%s: Mandatory parameter '%s' exists.",
+						VALIDATION_OK,
 						cp.key,
 					))
 			}
@@ -495,15 +508,19 @@ Validating object lock retention
 func validateLockRetention(basicConfig []Default) {
 	if isObjectLockRetentionMode(basicConfig) {
 		if !isObjectLockRetentionPeriod(basicConfig) {
-			message := "ERROR: You specified 'object_lock_retention_mode = cmp', "
-			message += "but no 'object_lock_retention_period' is specified."
+			message := fmt.Sprintf("%s: You specified 'object_lock_retention_mode = cmp', "+
+				"but no 'object_lock_retention_period' is specified.",
+				VALIDATION_ERROR,
+			)
 			Default{}.addInvalidValueMsg(message)
 		}
 	} else {
 		if isObjectLockRetentionPeriod(basicConfig) {
-			message := "ERROR: You did not specify 'object_lock_retention_mode' "
-			message += "or 'object_lock_retention_mode' is set to 'None', "
-			message += "but 'object_lock_retention_period' is specified.\n"
+			message := fmt.Sprintf("%s: You did not specify 'object_lock_retention_mode' "+
+				"or 'object_lock_retention_mode' is set to 'None', "+
+				"but 'object_lock_retention_period' is specified.\n",
+				VALIDATION_ERROR,
+			)
 			Default{}.addInvalidValueMsg(message)
 		}
 	}
@@ -566,9 +583,10 @@ func isValueInRange(value int, min int, max int) bool {
 Adding error message for missing mandatory parameter
 */
 func (cp Default) addMissingMandatoryMsg() {
-	message := fmt.Sprintf("ERROR: You did not specify a value"+
+	message := fmt.Sprintf("%s: You did not specify a value"+
 		" for the mandatory parameter"+
 		" '%s'.",
+		VALIDATION_ERROR,
 		cp.key,
 	)
 	if global.Args.CheckParms {
@@ -588,7 +606,8 @@ func (cp Default) addInvalidValueMsg(msg string) {
 	message := ""
 	if cp.configValue != "" && cp.key != "" {
 		message = fmt.Sprintf(
-			"ERROR: '%s': the value '%s' you specified is invalid. ",
+			"%s: '%s': the value '%s' you specified is invalid. ",
+			VALIDATION_ERROR,
 			cp.key,
 			cp.configValue,
 		)
@@ -611,8 +630,9 @@ func addOkMessage(key string) {
 
 		checkParmMessages = append(checkParmMessages,
 			fmt.Sprintf(
-				"\tOK: Parameter '%s' exists"+
+				"\t%s: Parameter '%s' exists"+
 					" and its value is valid.",
+				VALIDATION_OK,
 				key,
 			))
 	}

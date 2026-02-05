@@ -59,7 +59,6 @@ func buildBasicConfig(
 	configFilename string,
 ) []Default {
 	configParms := readConfigfile(configFilename)
-	configParms = addConfigParmsFromTooloption(configParms)
 	configuration := updateWithConfigValues(configParms)
 	return configuration
 }
@@ -97,22 +96,6 @@ func readConfigfile(filename string) []ConfigParameter {
 		}
 	}
 	return validateKeysInSections(parmsFromConfig)
-}
-
-/*
-Adding config parm from input file if TOOLOPTION is used as keyword
-*/
-func addConfigParmsFromTooloption(
-	parmsFromConfig []ConfigParameter,
-) []ConfigParameter {
-
-	for _, inputKeyword := range global.InputFileContent {
-		if inputKeyword.Keyword != "TOOLOPTION" {
-			continue
-		}
-		// TODO -> issue #20
-	}
-	return parmsFromConfig
 }
 
 /*
@@ -232,4 +215,18 @@ func getChunksizeSizeAndUnit(chunksize string) (string, string) {
 	unitU := strings.ToUpper(unit)
 
 	return size, unitU
+}
+
+/*
+Checking if TOOLOPTION is specified in input file
+*/
+func InputFileContainsTooloption(
+	inputFileContent []global.InputFileContentT,
+) bool {
+	for _, inputKeyword := range inputFileContent {
+		if inputKeyword.Keyword == TOOLOPTION {
+			return true
+		}
+	}
+	return false
 }

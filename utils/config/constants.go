@@ -75,6 +75,11 @@ const (
 	AUTH_APIKEY string = "apikey"
 )
 
+// Unsupported keywords in inputfile
+const (
+	TOOLOPTION = "TOOLOPTION"
+)
+
 // File validation values
 const (
 	FILEOK          = 0
@@ -83,4 +88,10 @@ const (
 
 	FILEMUSTEXIST = true
 	FILENOTEXIST  = false
+)
+
+// Validation message prefixes
+const (
+	VALIDATION_OK    = "OK"
+	VALIDATION_ERROR = "ERROR"
 )

@@ -19,6 +19,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/config"
 	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/cos"
 	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/global"
 	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/logging"
@@ -96,6 +97,11 @@ func Inquire(
 					)
 				}
 			}
+
+		case config.TOOLOPTION:
+			// Ignoring TOOLOPTION
+			continue
+
 		default:
 			// Wrong keyword specified in input file
 			global.Logger.Error(
