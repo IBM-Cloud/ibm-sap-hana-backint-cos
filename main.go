@@ -83,6 +83,14 @@ func main() {
 	global.Logger = logging.SetupLogging()
 	logging.WriteBackintInfo(global.Logger)
 
+	// Checking if the input file contains TOOLOPTION
+	if config.InputFileContainsTooloption(global.InputFileContent) {
+		global.Logger.Warning(fmt.Sprintf(
+			"%s specified in input file."+
+				" Option is not supported by backint agent.", config.TOOLOPTION,
+		))
+	}
+
 	// Initializing the variable which holds the messages to print out
 	// These messages must have a pre-defined format for the HANA system
 	// to recognize the results of the functions.
