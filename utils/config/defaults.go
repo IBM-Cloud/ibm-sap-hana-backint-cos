@@ -79,6 +79,13 @@ var max_concurrency = Default{
 	mandatory:      false,
 	validationType: CONFIG_RANGE}
 
+var recover_max_concurrency = Default{
+	key:            "recover_max_concurrency",
+	section:        SECTION_BACKINT,
+	defaultValue:   "0",
+	mandatory:      false,
+	validationType: CONFIG_INT}
+
 var multipart_chunksize = Default{
 	key:            "multipart_chunksize",
 	section:        SECTION_BACKINT,
@@ -164,6 +171,7 @@ var configDefaults = []Default{
 	endpoint_url,
 	ibm_auth_endpoint,
 	max_concurrency,
+	recover_max_concurrency,
 	multipart_chunksize,
 	remove_key_prefix,
 	additional_key_prefix,

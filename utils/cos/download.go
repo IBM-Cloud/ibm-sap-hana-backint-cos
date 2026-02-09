@@ -62,7 +62,7 @@ func Download(s3Client *s3.S3, element CosObject) Result {
 	downloadPartsResults := make(chan DownloadPartResult, numParts)
 
 	// Make sure that not more than the maximum number run concurrently
-	sem := make(chan struct{}, config.BackintConfig.MaxConcurrency())
+	sem := make(chan struct{}, config.BackintConfig.RecoverMaxConcurrency())
 
 	// Map containing the parts which are already downloaded
 	// but could not yet be written to pipe.
@@ -71,10 +71,10 @@ func Download(s3Client *s3.S3, element CosObject) Result {
 	partsNotYetWritten := make(ByteMap)
 
 	// Downloading parts asynchronously
-	// (limited by value of maxConcurrency)
+	// (limited by value of RecoverMaxConcurrency)
 	for _, downloadPart := range downloadParts {
 		wgGetObject.Add(1)
-		sem <- struct{}{} // block if maxConcurrency reached
+		sem <- struct{}{} // block if RecoverMaxConcurrency reached
 
 		downloadSingle := DownloadSingePart{
 			fifo:               fifo,
