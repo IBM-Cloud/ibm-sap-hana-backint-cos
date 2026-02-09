@@ -1,3 +1,17 @@
+// Copyright 2026 IBM Corp.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License
+
 package tests
 
 import (
@@ -43,9 +57,9 @@ func setupTempDir(t *testing.T) string {
 }
 
 // createAPIKeyFile creates a dummy API key file in the specified directory
-func createAPIKeyFile(t *testing.T, tmpDir string) string {
+func createAPIKeyFile(t *testing.T, tempDir string) string {
 	t.Helper()
-	apiKeyFile := filepath.Join(tmpDir, "apikey")
+	apiKeyFile := filepath.Join(tempDir, "apikey")
 	apikey := os.Getenv("APIKEY")
 	if apikey == "" {
 		t.Fatal("APIKEY not set.")
@@ -57,7 +71,7 @@ func createAPIKeyFile(t *testing.T, tmpDir string) string {
 }
 
 // prepareConfigFile reads a config template, replaces placeholders, and writes it to a temp location
-func prepareConfigFile(t *testing.T, tmpDir, apiKeyFile string, templateFile string) string {
+func prepareConfigFile(t *testing.T, tempDir, apiKeyFile string, templateFile string) string {
 	t.Helper()
 	templatePath := filepath.Join(templateDir, templateFile)
 	cfgFile := strings.ReplaceAll(templateFile, "tpl", "cfg")
@@ -68,7 +82,7 @@ func prepareConfigFile(t *testing.T, tmpDir, apiKeyFile string, templateFile str
 
 	cfgContent := strings.ReplaceAll(string(cfgBytes), apiKeyPlaceholder, apiKeyFile)
 
-	cfgPath := filepath.Join(tmpDir, cfgFile)
+	cfgPath := filepath.Join(tempDir, cfgFile)
 	if err := os.WriteFile(cfgPath, []byte(cfgContent), 0644); err != nil {
 		t.Fatalf("failed to write config file: %v", err)
 	}
@@ -84,21 +98,21 @@ func getExecutablePath() string {
 func setupConfigTests(t *testing.T) []ConfigTest {
 	t.Helper()
 
-	tmpDir := setupTempDir(t)
-	apiKeyFile := createAPIKeyFile(t, tmpDir)
+	tempDir := setupTempDir(t)
+	apiKeyFile := createAPIKeyFile(t, tempDir)
 
 	var configTests []ConfigTest
 
 	configTests = append(configTests, ConfigTest{
 		name:          "Valid Configuration",
-		cfgPath:       prepareConfigFile(t, tmpDir, apiKeyFile, cfgSuccessFile),
+		cfgPath:       prepareConfigFile(t, tempDir, apiKeyFile, cfgSuccessFile),
 		shouldSucceed: true,
 		msgToCheck:    "",
 	})
 
 	configTests = append(configTests, ConfigTest{
 		name:          "Invalid section",
-		cfgPath:       prepareConfigFile(t, tmpDir, apiKeyFile, cfgWrongSectionFile),
+		cfgPath:       prepareConfigFile(t, tempDir, apiKeyFile, cfgWrongSectionFile),
 		shouldSucceed: false,
 		msgToCheck: "ERROR: You specified the section 'cloud'," +
 			" but it is not part of the hdbbackint configuration.",
@@ -106,7 +120,7 @@ func setupConfigTests(t *testing.T) []ConfigTest {
 
 	configTests = append(configTests, ConfigTest{
 		name:          "Invalid range",
-		cfgPath:       prepareConfigFile(t, tmpDir, apiKeyFile, cfgwrongRangeFile),
+		cfgPath:       prepareConfigFile(t, tempDir, apiKeyFile, cfgwrongRangeFile),
 		shouldSucceed: false,
 		msgToCheck: "ERROR: 'max_concurrency':" +
 			" the value '1234' you specified is invalid.",
@@ -114,7 +128,7 @@ func setupConfigTests(t *testing.T) []ConfigTest {
 
 	configTests = append(configTests, ConfigTest{
 		name:          "Invalid object tags",
-		cfgPath:       prepareConfigFile(t, tmpDir, apiKeyFile, cfgWrongObjectTagsFile),
+		cfgPath:       prepareConfigFile(t, tempDir, apiKeyFile, cfgWrongObjectTagsFile),
 		shouldSucceed: false,
 		msgToCheck: "ERROR: 'object_tags': the value" +
 			" 'key1,val1,key2=val2' you specified is invalid.",
@@ -122,7 +136,7 @@ func setupConfigTests(t *testing.T) []ConfigTest {
 
 	configTests = append(configTests, ConfigTest{
 		name:          "Unknown parameter",
-		cfgPath:       prepareConfigFile(t, tmpDir, apiKeyFile, cfgUnknownParmFile),
+		cfgPath:       prepareConfigFile(t, tempDir, apiKeyFile, cfgUnknownParmFile),
 		shouldSucceed: false,
 		msgToCheck: "ERROR: You specified 'unknown_key'" +
 			" in section 'objects', but the key is unknown." +
@@ -131,7 +145,7 @@ func setupConfigTests(t *testing.T) []ConfigTest {
 
 	configTests = append(configTests, ConfigTest{
 		name:          "Parameter in wrong section",
-		cfgPath:       prepareConfigFile(t, tmpDir, apiKeyFile, cfgParmInWrongSectionFile),
+		cfgPath:       prepareConfigFile(t, tempDir, apiKeyFile, cfgParmInWrongSectionFile),
 		shouldSucceed: false,
 		msgToCheck: "ERROR: You specified 'object_tags' in section" +
 			" 'cloud_storage', but key belongs to section objects." +
@@ -140,7 +154,7 @@ func setupConfigTests(t *testing.T) []ConfigTest {
 
 	configTests = append(configTests, ConfigTest{
 		name:          "Wrong object lock retention period",
-		cfgPath:       prepareConfigFile(t, tmpDir, apiKeyFile, cfgObjLockWrongPeriodFile),
+		cfgPath:       prepareConfigFile(t, tempDir, apiKeyFile, cfgObjLockWrongPeriodFile),
 		shouldSucceed: false,
 		msgToCheck: "The value you specified for 'object_lock_retention_period'" +
 			" does not have the correct format.",
@@ -148,7 +162,7 @@ func setupConfigTests(t *testing.T) []ConfigTest {
 
 	configTests = append(configTests, ConfigTest{
 		name:          "Missing object lock retention period",
-		cfgPath:       prepareConfigFile(t, tmpDir, apiKeyFile, cfgObjMissingPeriodFile),
+		cfgPath:       prepareConfigFile(t, tempDir, apiKeyFile, cfgObjMissingPeriodFile),
 		shouldSucceed: false,
 		msgToCheck: "ERROR: You specified 'object_lock_retention_mode = cmp'," +
 			" but no 'object_lock_retention_period' is specified.",
@@ -156,14 +170,14 @@ func setupConfigTests(t *testing.T) []ConfigTest {
 
 	configTests = append(configTests, ConfigTest{
 		name:          "Missing mandatory parameter",
-		cfgPath:       prepareConfigFile(t, tmpDir, apiKeyFile, cfgMissingMandParmFile),
+		cfgPath:       prepareConfigFile(t, tempDir, apiKeyFile, cfgMissingMandParmFile),
 		shouldSucceed: false,
 		msgToCheck:    "ERROR: You did not specify a value for the mandatory parameter",
 	})
 
 	configTests = append(configTests, ConfigTest{
 		name:          "More than one error",
-		cfgPath:       prepareConfigFile(t, tmpDir, apiKeyFile, cfgMixedErrorFile),
+		cfgPath:       prepareConfigFile(t, tempDir, apiKeyFile, cfgMixedErrorFile),
 		shouldSucceed: false,
 		msgToCheck: "ERROR: 'object_tags': the value" +
 			" 'key1,val1,key2=val2' you specified is invalid.",
