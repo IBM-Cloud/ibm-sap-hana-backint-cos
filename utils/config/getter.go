@@ -148,6 +148,18 @@ func (b BackintConfigT) ObjectLockRetentionPeriod() string {
 }
 
 /*
+Getting the max concurrency for recovery
+If set to 0, we take the value from max_concurrency
+*/
+func (b BackintConfigT) RecoverMaxConcurrency() int {
+	rmc := global.ToInteger(b.Get("recover_max_concurrency"))
+	if rmc == 0 {
+		return global.ToInteger(b.Get("max_concurrency"))
+	}
+	return rmc
+}
+
+/*
 Getting the region
 */
 func (b BackintConfigT) Region() string {
