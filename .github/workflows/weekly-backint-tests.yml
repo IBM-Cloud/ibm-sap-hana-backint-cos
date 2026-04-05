@@ -22,8 +22,6 @@ env:
   HANA_SID: "BHB"
   HANA_INSTANCE: "10"
   POWER_VM_IP: "10.80.3.21"
-  RETENTION_DAYS: 1
-  REPORT_FORMAT: "html,markdown"
 
 jobs:
   weekly-test:
@@ -32,6 +30,9 @@ jobs:
     timeout-minutes: 120
 
     steps:
+      # ---------------------------------------------------------------
+      # STAGE 1: Prepare source code
+      # ---------------------------------------------------------------
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
@@ -39,55 +40,115 @@ jobs:
 
       - name: Get Latest Release
         id: get-release
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const releaseTag = '${{ github.event.inputs.release_tag }}';
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT_RELEASE_TAG: ${{ github.event.inputs.release_tag }}
+        run: |
+          python3 << 'PYEOF'
+          import os
+          import json
+          import urllib.request
+          import urllib.error
 
-            if (releaseTag) {
-              console.log(`Using specified release: ${releaseTag}`);
-              core.setOutput('tag', releaseTag);
-              core.setOutput('url', `https://github.com/${context.repo.owner}/${context.repo.repo}/releases/tag/${releaseTag}`);
-            } else {
-              const { data: release } = await github.rest.repos.getLatestRelease({
-                owner: context.repo.owner,
-                repo: context.repo.repo
-              });
-              console.log(`Latest release: ${release.tag_name}`);
-              core.setOutput('tag', release.tag_name);
-              core.setOutput('url', release.html_url);
-              core.setOutput('published_at', release.published_at);
-            }
+          release_tag = os.environ.get("INPUT_RELEASE_TAG", "").strip()
+          token = os.environ["GITHUB_TOKEN"]
+          repo = os.environ["GITHUB_REPOSITORY"]
+          github_output = os.environ["GITHUB_OUTPUT"]
+          server_url = os.environ.get("GITHUB_SERVER_URL", "https://github.com")
+
+          # Use correct API base for GitHub Enterprise vs github.com
+          if "github.com" in server_url and "github.ibm.com" not in server_url:
+              api_base = "https://api.github.com"
+          else:
+              api_base = f"{server_url}/api/v3"
+
+          headers = {
+              "Authorization": f"token {token}",
+              "Accept": "application/vnd.github.v3+json"
+          }
+
+          if release_tag:
+              print(f"Using specified release: {release_tag}")
+              tag = release_tag
+              url = f"{server_url}/{repo}/releases/tag/{release_tag}"
+              published_at = ""
+          else:
+              print("No release tag provided, fetching latest release...")
+              api_url = f"{api_base}/repos/{repo}/releases/latest"
+              req = urllib.request.Request(api_url, headers=headers)
+
+              try:
+                  with urllib.request.urlopen(req) as response:
+                      release = json.loads(response.read().decode())
+                      tag = release["tag_name"]
+                      url = release["html_url"]
+                      published_at = release.get("published_at", "")
+                      print(f"Latest release: {tag}")
+              except urllib.error.HTTPError as e:
+                  if e.code == 404:
+                      print("ERROR: No releases found in this repository.")
+                      print("Please provide a release_tag input.")
+                      raise SystemExit(1)
+                  raise
+
+          # Pass outputs to downstream steps
+          with open(github_output, "a") as f:
+              f.write(f"tag={tag}\n")
+              f.write(f"url={url}\n")
+              f.write(f"published_at={published_at}\n")
+
+          print(f"Release tag: {tag}")
+          print(f"Release URL: {url}")
+          PYEOF
 
       - name: Checkout Release Tag
         run: |
           RELEASE_TAG="${{ steps.get-release.outputs.tag }}"
           echo "Checking out release tag: ${RELEASE_TAG}"
-
           git checkout ${RELEASE_TAG}
-          echo "Release tag checked out successfully"
-          echo "Note: Binary will be built by prerequisite playbook"
+          echo "✅ Release tag checked out successfully"
 
+      # ---------------------------------------------------------------
+      # STAGE 2: Install dependencies (idempotent)
+      # ---------------------------------------------------------------
       - name: Install Dependencies
         run: |
-          # Install Ansible if not present
+          CHANGED=false
+
           if ! command -v ansible &> /dev/null; then
+            echo "Installing Ansible..."
             sudo apt-get update
             sudo apt-get install -y ansible python3-pip
+            CHANGED=true
+          else
+            echo "✅ Ansible already installed: $(ansible --version | head -1)"
           fi
 
-          # Install IBM Cloud CLI if not present
           if ! command -v ibmcloud &> /dev/null; then
+            echo "Installing IBM Cloud CLI..."
             curl -fsSL https://clis.cloud.ibm.com/install/linux | sh
+            CHANGED=true
+          else
+            echo "✅ IBM Cloud CLI already installed: $(ibmcloud --version | head -1)"
           fi
 
-          # Install required Python packages
-          pip3 install --user jmespath
+          if ! python3 -c "import jmespath" &> /dev/null; then
+            echo "Installing jmespath..."
+            pip3 install --user jmespath
+            CHANGED=true
+          else
+            echo "✅ jmespath already installed"
+          fi
 
-          # Install report generation tools
-          pip3 install --user markdown jinja2
+          if [ "$CHANGED" = true ]; then
+            echo "Dependencies were installed"
+          else
+            echo "✅ All dependencies already present — nothing changed"
+          fi
 
+      # ---------------------------------------------------------------
+      # STAGE 3: Clone playbooks and create symlink
+      # ---------------------------------------------------------------
       - name: Clone Ansible Playbooks
         env:
           GHE_PAT: ${{ secrets.GHE_PAT }}
@@ -99,29 +160,48 @@ jobs:
 
           PLAYBOOK_COMMIT=$(git rev-parse HEAD)
           echo "playbook_commit=${PLAYBOOK_COMMIT}" >> $GITHUB_ENV
+          echo "✅ Playbook repository cloned (commit: ${PLAYBOOK_COMMIT})"
 
-          echo "Playbook repository cloned successfully"
+          cd ${GITHUB_WORKSPACE}
 
-          # Create symbolic link for source code at expected location
-          # Playbook expects: {{ playbook_dir }}/../../ibm-sap-hana-backint-cos
-          # Which resolves to: ansible-playbooks/ibm-sap-hana-backint-cos
-          echo "Creating symbolic link for source code..."
+          # Playbook expects go source at:
+          #   {{ playbook_dir }}/../../ibm-sap-hana-backint-cos
+          #   = ansible-playbooks/ansible/playbooks/../../ibm-sap-hana-backint-cos
+          #   = ansible-playbooks/ibm-sap-hana-backint-cos
+          echo "Creating symbolic link for Go source..."
           ln -s ${GITHUB_WORKSPACE} ${GITHUB_WORKSPACE}/ansible-playbooks/ibm-sap-hana-backint-cos
 
-          echo "Directory structure:"
-          ls -la
-          ls -la ibm-sap-hana-backint-cos/ || echo "Symlink verification"
+          # Verify the symlink resolves correctly
+          if [ -f "${GITHUB_WORKSPACE}/ansible-playbooks/ibm-sap-hana-backint-cos/go.mod" ]; then
+            echo "✅ Go source accessible via symlink (go.mod found)"
+          else
+            echo "❌ Go source NOT found via symlink — build will fail"
+            exit 1
+          fi
+
+          echo "Playbook will resolve go_source_dir to:"
+          realpath ${GITHUB_WORKSPACE}/ansible-playbooks/ansible/playbooks/../../ibm-sap-hana-backint-cos
+
+      # ---------------------------------------------------------------
+      # STAGE 4: Setup SSH and validate infrastructure
+      # ---------------------------------------------------------------
+      - name: Setup SSH Agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.POWER_VM_SSH_KEY }}
+
+      - name: Add jump hosts to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${POWER_VM_IP} >> ~/.ssh/known_hosts 2>/dev/null \
+            || echo "⚠️ ssh-keyscan failed for ${POWER_VM_IP}"
 
       - name: Setup SSH Key for Power VM
         env:
           POWER_VM_SSH_KEY: ${{ secrets.POWER_VM_SSH_KEY }}
         run: |
-          mkdir -p ~/.ssh
           echo "$POWER_VM_SSH_KEY" > /tmp/power_vm_key
           chmod 600 /tmp/power_vm_key
-
-          # Add Power VM to known hosts
-          ssh-keyscan -H ${POWER_VM_IP} >> ~/.ssh/known_hosts 2>/dev/null || true
 
       - name: Validate Environment
         env:
@@ -130,19 +210,25 @@ jobs:
           echo "Validating environment..."
 
           # Test Power VM connectivity
-          ssh -i /tmp/power_vm_key -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
+          ssh -i /tmp/power_vm_key \
+            -o StrictHostKeyChecking=no \
+            -o ConnectTimeout=10 \
             root@${POWER_VM_IP} "echo 'Power VM connection successful'"
 
-          # Test SAP HANA status
-          ssh -i /tmp/power_vm_key -o StrictHostKeyChecking=no \
-            root@${POWER_VM_IP} "su - ${HANA_SID,,}adm -c 'HDB info'" || \
-            echo "Warning: Could not verify HANA status"
+          # Test SAP HANA status — fail early if HANA is down
+          ssh -i /tmp/power_vm_key \
+            -o StrictHostKeyChecking=no \
+            root@${POWER_VM_IP} \
+            "su - ${HANA_SID,,}adm -c 'HDB info'"
 
           # Login to IBM Cloud
           ibmcloud login --apikey ${IC_API_KEY} -r ${IBM_REGION} -g ${IBM_RESOURCE_GROUP}
 
-          echo "Environment validation complete"
+          echo "✅ Environment validation complete"
 
+      # ---------------------------------------------------------------
+      # STAGE 5: Build and test
+      # ---------------------------------------------------------------
       - name: Run Prerequisites Playbook (Builds Binary)
         env:
           IC_API_KEY: ${{ secrets.IC_API_KEY }}
@@ -150,15 +236,12 @@ jobs:
           cd ansible-playbooks
 
           echo "Running prerequisites playbook..."
-          echo "Note: Playbook will build binary from release tag at ibm-sap-hana-backint-cos/"
           ansible-playbook ansible/playbooks/playbook_prereqs.yml \
-            -i ansible/inventory/intel_vsi.yml \
-            --extra-vars "ibm_region=${IBM_REGION}" \
-            --extra-vars "ibm_resource_group=${IBM_RESOURCE_GROUP}" \
-            --extra-vars "ic_api_key=${IC_API_KEY}" \
+            --extra-vars "api_key_value=${IC_API_KEY}" \
             -v
 
-      - name: Execute Comprehensive Tests
+      - name: Run execute-tests Playbook (Executes Tests)
+        if: success()
         id: execute-tests
         env:
           HANA_SYSTEM_PASSWORD: ${{ secrets.HANA_SYSTEM_PASSWORD }}
@@ -176,20 +259,21 @@ jobs:
           DURATION=$((END_TIME - START_TIME))
 
           echo "duration=${DURATION}" >> $GITHUB_OUTPUT
-          echo "Tests completed in ${DURATION} seconds"
+          echo "✅ Tests completed in ${DURATION} seconds"
 
+      # ---------------------------------------------------------------
+      # STAGE 6: Collect results and clean up
+      # ---------------------------------------------------------------
       - name: Collect Test Results
         if: always()
         run: |
           echo "Collecting test results..."
           mkdir -p test-results
 
-          # Copy artifacts from ansible playbooks
           if [ -d "ansible-playbooks/artifacts" ]; then
             cp -r ansible-playbooks/artifacts/* test-results/ || true
           fi
 
-          # Collect system information
           cat > test-results/system-info.txt << EOF
           Weekly Test Run Information
           ============================
@@ -198,6 +282,7 @@ jobs:
           Release URL: ${{ steps.get-release.outputs.url }}
           Playbook Commit: ${playbook_commit}
           Test Duration: ${{ steps.execute-tests.outputs.duration }} seconds
+          Test Outcome: ${{ steps.execute-tests.outcome }}
 
           Environment:
           - Power VM: ${POWER_VM_IP}
@@ -208,183 +293,25 @@ jobs:
 
           cat test-results/system-info.txt
 
-      - name: Generate HTML Report
-        if: always()
-        run: |
-          cat > test-results/report.html << 'EOF'
-          <!DOCTYPE html>
-          <html>
-          <head>
-              <title>Weekly Backint Test Report</title>
-              <style>
-                  body { font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }
-                  .container { max-width: 1200px; margin: 0 auto; background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-                  h1 { color: #0f62fe; border-bottom: 3px solid #0f62fe; padding-bottom: 10px; }
-                  h2 { color: #333; margin-top: 30px; }
-                  .status-pass { color: #24a148; font-weight: bold; }
-                  .status-fail { color: #da1e28; font-weight: bold; }
-                  table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-                  th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
-                  th { background-color: #0f62fe; color: white; }
-                  tr:hover { background-color: #f5f5f5; }
-                  .metric { display: inline-block; margin: 10px 20px 10px 0; padding: 15px; background-color: #e8f4fd; border-radius: 4px; }
-                  .metric-label { font-size: 12px; color: #666; }
-                  .metric-value { font-size: 24px; font-weight: bold; color: #0f62fe; }
-                  .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; color: #666; font-size: 12px; }
-              </style>
-          </head>
-          <body>
-              <div class="container">
-                  <h1>📊 Weekly Backint Test Report</h1>
-
-                  <div class="metric">
-                      <div class="metric-label">Test Status</div>
-                      <div class="metric-value status-pass">PASSED</div>
-                  </div>
-
-                  <div class="metric">
-                      <div class="metric-label">Duration</div>
-                      <div class="metric-value">${{ steps.execute-tests.outputs.duration }}s</div>
-                  </div>
-
-                  <div class="metric">
-                      <div class="metric-label">Release</div>
-                      <div class="metric-value">${{ steps.get-release.outputs.tag }}</div>
-                  </div>
-
-                  <h2>Test Summary</h2>
-                  <table>
-                      <tr>
-                          <th>Test Suite</th>
-                          <th>Status</th>
-                          <th>Details</th>
-                      </tr>
-                      <tr>
-                          <td>Environment Validation</td>
-                          <td class="status-pass">✅ PASSED</td>
-                          <td>Power VM and HANA connectivity verified</td>
-                      </tr>
-                      <tr>
-                          <td>Prerequisites</td>
-                          <td class="status-pass">✅ PASSED</td>
-                          <td>Binary built from release and configured</td>
-                      </tr>
-                      <tr>
-                          <td>Backint Tests</td>
-                          <td class="status-pass">✅ PASSED</td>
-                          <td>Full test suite executed successfully</td>
-                      </tr>
-                      <tr>
-                          <td>Cleanup</td>
-                          <td class="status-pass">✅ PASSED</td>
-                          <td>Resources cleaned up</td>
-                      </tr>
-                  </table>
-
-                  <h2>Environment Details</h2>
-                  <table>
-                      <tr>
-                          <th>Component</th>
-                          <th>Value</th>
-                      </tr>
-                      <tr>
-                          <td>Release Tag</td>
-                          <td>${{ steps.get-release.outputs.tag }}</td>
-                      </tr>
-                      <tr>
-                          <td>Release URL</td>
-                          <td><a href="${{ steps.get-release.outputs.url }}">${{ steps.get-release.outputs.url }}</a></td>
-                      </tr>
-                      <tr>
-                          <td>Power VM</td>
-                          <td>${POWER_VM_IP}</td>
-                      </tr>
-                      <tr>
-                          <td>SAP HANA</td>
-                          <td>${HANA_SID}/${HANA_INSTANCE}</td>
-                      </tr>
-                      <tr>
-                          <td>COS Region</td>
-                          <td>${IBM_REGION}</td>
-                      </tr>
-                      <tr>
-                          <td>Playbook Commit</td>
-                          <td>${playbook_commit}</td>
-                      </tr>
-                  </table>
-
-                  <div class="footer">
-                      <p>Generated on: $(date -u +"%Y-%m-%d %H:%M:%S UTC")</p>
-                      <p>Workflow Run: <a href="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}">${{ github.run_id }}</a></p>
-                  </div>
-              </div>
-          </body>
-          </html>
-          EOF
-
-      - name: Generate Markdown Report
-        if: always()
-        run: |
-          cat > test-results/report.md << 'EOF'
-          # 📊 Weekly Backint Test Report
-
-          ## Test Summary
-
-          **Status**: ✅ PASSED
-          **Duration**: ${{ steps.execute-tests.outputs.duration }} seconds
-          **Release**: ${{ steps.get-release.outputs.tag }}
-          **Run Date**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-
-          ## Test Results
-
-          | Test Suite | Status | Details |
-          |------------|--------|---------|
-          | Environment Validation | ✅ PASSED | Power VM and HANA connectivity verified |
-          | Prerequisites | ✅ PASSED | Binary built from release and configured |
-          | Backint Tests | ✅ PASSED | Full test suite executed successfully |
-          | Cleanup | ✅ PASSED | Resources cleaned up |
-
-          ## Environment Details
-
-          - **Release Tag**: ${{ steps.get-release.outputs.tag }}
-          - **Release URL**: ${{ steps.get-release.outputs.url }}
-          - **Power VM**: ${POWER_VM_IP}
-          - **SAP HANA**: ${HANA_SID}/${HANA_INSTANCE}
-          - **COS Region**: ${IBM_REGION}
-          - **Resource Group**: ${IBM_RESOURCE_GROUP}
-          - **Playbook Commit**: ${playbook_commit}
-
-          ## Artifacts
-
-          - [Test Logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-          - [Full Results](Download artifacts from workflow run)
-
-          ---
-
-          *Generated by GitHub Actions on $(date -u +"%Y-%m-%d %H:%M:%S UTC")*
-          EOF
-
       - name: Upload Test Artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: weekly-test-results-${{ steps.get-release.outputs.tag }}
+          name: backint-test-results-${{ steps.get-release.outputs.tag }}-${{ github.run_number }}
           path: test-results/
-          retention-days: ${{ env.RETENTION_DAYS }}
+          retention-days: 14
 
       - name: Cleanup
         if: always()
         run: |
           echo "Running cleanup..."
 
-          # Run cleanup playbook
           if [ -d "ansible-playbooks" ]; then
             cd ansible-playbooks
             ansible-playbook ansible/playbooks/playbook_cleanup.yml \
-              -v || echo "Cleanup playbook failed, continuing..."
+              -v || echo "⚠️ Cleanup playbook failed, continuing..."
           fi
 
-          # Remove SSH key
           rm -f /tmp/power_vm_key
 
-          echo "Cleanup complete"
+          echo "✅ Cleanup complete"
