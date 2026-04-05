@@ -9,11 +9,6 @@ on:
         description: "Specific release tag to test (leave empty for latest)"
         required: false
         type: string
-      notify_team:
-        description: "Send notification to team"
-        required: false
-        type: boolean
-        default: true
 
 concurrency:
   group: backint-weekly-tests
