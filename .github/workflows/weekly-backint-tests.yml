@@ -119,17 +119,40 @@ jobs:
         run: |
           RELEASE_TAG="${{ steps.get-release.outputs.tag }}"
           RELEASE_COMMIT=$(git rev-parse HEAD)
+          REPO="IBM-Cloud/ibm-sap-hana-backint-cos"
 
           mkdir -p ${GITHUB_WORKSPACE}/release-binary
 
-          # Download the zip asset from the release
-          gh release download "${RELEASE_TAG}" \
-            --pattern "*.zip" \
-            --dir ${GITHUB_WORKSPACE}/release-binary
+          # Get the zip asset download URL from the release
+          ASSET_URL=$(curl -s \
+            -H "Authorization: token ${GH_TOKEN}" \
+            "https://api.github.com/repos/${REPO}/releases/tags/${RELEASE_TAG}" \
+            | python3 -c "
+          import sys, json
+          assets = json.load(sys.stdin).get('assets', [])
+          for a in assets:
+              if a['name'].endswith('.zip'):
+                  print(a['url'])
+                  break
+          ")
+
+          if [ -z "${ASSET_URL}" ]; then
+            echo "❌ No zip asset found in release ${RELEASE_TAG}"
+            exit 1
+          fi
+
+          echo "Downloading asset from: ${ASSET_URL}"
+
+          # Download the actual binary asset
+          curl -L \
+            -H "Authorization: token ${GH_TOKEN}" \
+            -H "Accept: application/octet-stream" \
+            -o ${GITHUB_WORKSPACE}/release-binary/release.zip \
+            "${ASSET_URL}"
 
           # Unzip
           cd ${GITHUB_WORKSPACE}/release-binary
-          unzip *.zip
+          unzip release.zip
           echo "✅ Release zip extracted"
 
           # Find the binary
@@ -143,7 +166,6 @@ jobs:
 
           chmod +x "${BINARY_PATH}"
 
-          # Export for playbook
           echo "prebuilt_binary_path=${BINARY_PATH}" >> $GITHUB_ENV
           echo "prebuilt_version=${RELEASE_TAG}" >> $GITHUB_ENV
           echo "prebuilt_commit=${RELEASE_COMMIT}" >> $GITHUB_ENV
