@@ -100,6 +100,10 @@ jobs:
           print(f"Release tag: {tag}")
           print(f"Release URL: {url}")
           PYEOF
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # fetches all history & tags so git checkout <tag> works
 
       - name: Checkout Release Tag
         run: |
@@ -107,6 +111,12 @@ jobs:
           echo "Checking out release tag: ${RELEASE_TAG}"
           git checkout ${RELEASE_TAG}
           echo "✅ Release tag checked out successfully"
+          - name: Checkout Release Tag
+            run: |
+              RELEASE_TAG="${{ steps.get-release.outputs.tag }}"
+              echo "Checking out release tag: ${RELEASE_TAG}"
+              git checkout ${RELEASE_TAG}
+              echo "✅ Release tag checked out successfully"
 
       # ---------------------------------------------------------------
       # STAGE 2: Install dependencies (idempotent)
