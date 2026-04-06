@@ -100,10 +100,11 @@ jobs:
           print(f"Release tag: {tag}")
           print(f"Release URL: {url}")
           PYEOF
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # fetches all history & tags so git checkout <tag> works
+          fetch-depth: 0
 
       - name: Checkout Release Tag
         run: |
@@ -111,6 +112,43 @@ jobs:
           echo "Checking out release tag: ${RELEASE_TAG}"
           git checkout ${RELEASE_TAG}
           echo "✅ Release tag checked out successfully"
+
+      - name: Download release binary
+        env:
+          GH_TOKEN: ${{ secrets.GHE_PAT }}
+        run: |
+          RELEASE_TAG="${{ steps.get-release.outputs.tag }}"
+          RELEASE_COMMIT=$(git rev-parse HEAD)
+
+          mkdir -p ${GITHUB_WORKSPACE}/release-binary
+
+          # Download the zip asset from the release
+          gh release download "${RELEASE_TAG}" \
+            --pattern "*.zip" \
+            --dir ${GITHUB_WORKSPACE}/release-binary
+
+          # Unzip
+          cd ${GITHUB_WORKSPACE}/release-binary
+          unzip *.zip
+          echo "✅ Release zip extracted"
+
+          # Find the binary
+          BINARY_PATH=$(find ${GITHUB_WORKSPACE}/release-binary -name "hdbbackint" -type f | head -1)
+
+          if [ -z "${BINARY_PATH}" ]; then
+            echo "❌ hdbbackint binary not found in zip"
+            find ${GITHUB_WORKSPACE}/release-binary -type f
+            exit 1
+          fi
+
+          chmod +x "${BINARY_PATH}"
+
+          # Export for playbook
+          echo "prebuilt_binary_path=${BINARY_PATH}" >> $GITHUB_ENV
+          echo "prebuilt_version=${RELEASE_TAG}" >> $GITHUB_ENV
+          echo "prebuilt_commit=${RELEASE_COMMIT}" >> $GITHUB_ENV
+
+          echo "✅ Binary: ${BINARY_PATH} (${RELEASE_TAG} @ ${RELEASE_COMMIT})"
 
       # ---------------------------------------------------------------
       # STAGE 2: Install dependencies (idempotent)
@@ -151,7 +189,7 @@ jobs:
           fi
 
       # ---------------------------------------------------------------
-      # STAGE 3: Clone playbooks and create symlink
+      # STAGE 3: Clone playbooks
       # ---------------------------------------------------------------
       - name: Clone Ansible Playbooks
         env:
@@ -165,26 +203,6 @@ jobs:
           PLAYBOOK_COMMIT=$(git rev-parse HEAD)
           echo "playbook_commit=${PLAYBOOK_COMMIT}" >> $GITHUB_ENV
           echo "✅ Playbook repository cloned (commit: ${PLAYBOOK_COMMIT})"
-
-          cd ${GITHUB_WORKSPACE}
-
-          # Playbook expects go source at:
-          #   {{ playbook_dir }}/../../ibm-sap-hana-backint-cos
-          #   = ansible-playbooks/ansible/playbooks/../../ibm-sap-hana-backint-cos
-          #   = ansible-playbooks/ibm-sap-hana-backint-cos
-          echo "Creating symbolic link for Go source..."
-          ln -s ${GITHUB_WORKSPACE} ${GITHUB_WORKSPACE}/ansible-playbooks/ibm-sap-hana-backint-cos
-
-          # Verify the symlink resolves correctly
-          if [ -f "${GITHUB_WORKSPACE}/ansible-playbooks/ibm-sap-hana-backint-cos/go.mod" ]; then
-            echo "✅ Go source accessible via symlink (go.mod found)"
-          else
-            echo "❌ Go source NOT found via symlink — build will fail"
-            exit 1
-          fi
-
-          echo "Playbook will resolve go_source_dir to:"
-          realpath ${GITHUB_WORKSPACE}/ansible-playbooks/ansible/playbooks/../../ibm-sap-hana-backint-cos
 
       # ---------------------------------------------------------------
       # STAGE 4: Setup SSH and validate infrastructure
@@ -233,15 +251,19 @@ jobs:
       # ---------------------------------------------------------------
       # STAGE 5: Build and test
       # ---------------------------------------------------------------
-      - name: Run Prerequisites Playbook (Builds Binary)
+      - name: Run Prerequisites Playbook (Skip Build, Use Release Binary)
         env:
           IC_API_KEY: ${{ secrets.IC_API_KEY }}
         run: |
           cd ansible-playbooks
 
-          echo "Running prerequisites playbook..."
+          echo "Running prerequisites playbook (using pre-built binary)..."
           ansible-playbook ansible/playbooks/playbook_prereqs.yml \
             --extra-vars "api_key_value=${IC_API_KEY}" \
+            --extra-vars "skip_binary_build=true" \
+            --extra-vars "prebuilt_binary_path=${{ env.prebuilt_binary_path }}" \
+            --extra-vars "prebuilt_version=${{ env.prebuilt_version }}" \
+            --extra-vars "prebuilt_commit=${{ env.prebuilt_commit }}" \
             -v
 
       - name: Run execute-tests Playbook (Executes Tests)
