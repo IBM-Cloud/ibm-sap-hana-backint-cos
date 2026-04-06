@@ -412,12 +412,15 @@ jobs:
 
       - name: Cleanup
         if: always()
+        env:
+          IC_API_KEY: ${{ secrets.IC_API_KEY }}
         run: |
           echo "Running cleanup..."
 
           if [ -d "ansible-playbooks" ]; then
             cd ansible-playbooks
             ansible-playbook ansible/playbooks/playbook_cleanup.yml \
+              --extra-vars "api_key_value=${IC_API_KEY}" \
               -v || echo "⚠️ Cleanup playbook failed, continuing..."
           fi
 
