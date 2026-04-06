@@ -18,7 +18,7 @@ env:
   ANSIBLE_PLAYBOOK_REPO: "github.ibm.com/SOPHC/ansible-playbooks-backint"
   ANSIBLE_PLAYBOOK_BRANCH: "feature-prereq"
   IBM_REGION: "us-south"
-  IBM_RESOURCE_GROUP: "Babitha-hanatest"
+  IBM_RESOURCE_GROUP: "Backint-Hana"
   HANA_SID: "BHB"
   HANA_INSTANCE: "10"
   POWER_VM_IP: "10.80.3.21"
@@ -26,7 +26,7 @@ env:
 jobs:
   weekly-test:
     name: Weekly Backint Validation
-    runs-on: [self-hosted]
+    runs-on: self-hosted
     timeout-minutes: 120
 
     steps:
