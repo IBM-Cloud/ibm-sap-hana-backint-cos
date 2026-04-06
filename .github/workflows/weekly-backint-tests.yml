@@ -1,0 +1,317 @@
+name: Weekly Backint Tests
+
+on:
+  schedule:
+    - cron: "0 2 * * 1" # Every Monday at 2 AM UTC
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Specific release tag to test (leave empty for latest)"
+        required: false
+        type: string
+
+concurrency:
+  group: backint-weekly-tests
+  cancel-in-progress: false
+
+env:
+  ANSIBLE_PLAYBOOK_REPO: "github.ibm.com/SOPHC/ansible-playbooks-backint"
+  ANSIBLE_PLAYBOOK_BRANCH: "feature-prereq"
+  IBM_REGION: "us-south"
+  IBM_RESOURCE_GROUP: "Babitha-hanatest"
+  HANA_SID: "BHB"
+  HANA_INSTANCE: "10"
+  POWER_VM_IP: "10.80.3.21"
+
+jobs:
+  weekly-test:
+    name: Weekly Backint Validation
+    runs-on: [self-hosted]
+    timeout-minutes: 120
+
+    steps:
+      # ---------------------------------------------------------------
+      # STAGE 1: Prepare source code
+      # ---------------------------------------------------------------
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get Latest Release
+        id: get-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT_RELEASE_TAG: ${{ github.event.inputs.release_tag }}
+        run: |
+          python3 << 'PYEOF'
+          import os
+          import json
+          import urllib.request
+          import urllib.error
+
+          release_tag = os.environ.get("INPUT_RELEASE_TAG", "").strip()
+          token = os.environ["GITHUB_TOKEN"]
+          repo = os.environ["GITHUB_REPOSITORY"]
+          github_output = os.environ["GITHUB_OUTPUT"]
+          server_url = os.environ.get("GITHUB_SERVER_URL", "https://github.com")
+
+          # Use correct API base for GitHub Enterprise vs github.com
+          if "github.com" in server_url and "github.ibm.com" not in server_url:
+              api_base = "https://api.github.com"
+          else:
+              api_base = f"{server_url}/api/v3"
+
+          headers = {
+              "Authorization": f"token {token}",
+              "Accept": "application/vnd.github.v3+json"
+          }
+
+          if release_tag:
+              print(f"Using specified release: {release_tag}")
+              tag = release_tag
+              url = f"{server_url}/{repo}/releases/tag/{release_tag}"
+              published_at = ""
+          else:
+              print("No release tag provided, fetching latest release...")
+              api_url = f"{api_base}/repos/{repo}/releases/latest"
+              req = urllib.request.Request(api_url, headers=headers)
+
+              try:
+                  with urllib.request.urlopen(req) as response:
+                      release = json.loads(response.read().decode())
+                      tag = release["tag_name"]
+                      url = release["html_url"]
+                      published_at = release.get("published_at", "")
+                      print(f"Latest release: {tag}")
+              except urllib.error.HTTPError as e:
+                  if e.code == 404:
+                      print("ERROR: No releases found in this repository.")
+                      print("Please provide a release_tag input.")
+                      raise SystemExit(1)
+                  raise
+
+          # Pass outputs to downstream steps
+          with open(github_output, "a") as f:
+              f.write(f"tag={tag}\n")
+              f.write(f"url={url}\n")
+              f.write(f"published_at={published_at}\n")
+
+          print(f"Release tag: {tag}")
+          print(f"Release URL: {url}")
+          PYEOF
+
+      - name: Checkout Release Tag
+        run: |
+          RELEASE_TAG="${{ steps.get-release.outputs.tag }}"
+          echo "Checking out release tag: ${RELEASE_TAG}"
+          git checkout ${RELEASE_TAG}
+          echo "✅ Release tag checked out successfully"
+
+      # ---------------------------------------------------------------
+      # STAGE 2: Install dependencies (idempotent)
+      # ---------------------------------------------------------------
+      - name: Install Dependencies
+        run: |
+          CHANGED=false
+
+          if ! command -v ansible &> /dev/null; then
+            echo "Installing Ansible..."
+            sudo apt-get update
+            sudo apt-get install -y ansible python3-pip
+            CHANGED=true
+          else
+            echo "✅ Ansible already installed: $(ansible --version | head -1)"
+          fi
+
+          if ! command -v ibmcloud &> /dev/null; then
+            echo "Installing IBM Cloud CLI..."
+            curl -fsSL https://clis.cloud.ibm.com/install/linux | sh
+            CHANGED=true
+          else
+            echo "✅ IBM Cloud CLI already installed: $(ibmcloud --version | head -1)"
+          fi
+
+          if ! python3 -c "import jmespath" &> /dev/null; then
+            echo "Installing jmespath..."
+            pip3 install --user jmespath
+            CHANGED=true
+          else
+            echo "✅ jmespath already installed"
+          fi
+
+          if [ "$CHANGED" = true ]; then
+            echo "Dependencies were installed"
+          else
+            echo "✅ All dependencies already present — nothing changed"
+          fi
+
+      # ---------------------------------------------------------------
+      # STAGE 3: Clone playbooks and create symlink
+      # ---------------------------------------------------------------
+      - name: Clone Ansible Playbooks
+        env:
+          GHE_PAT: ${{ secrets.GHE_PAT }}
+        run: |
+          echo "Cloning ansible-playbooks-backint repository..."
+          git clone https://${GHE_PAT}@${ANSIBLE_PLAYBOOK_REPO}.git ansible-playbooks
+          cd ansible-playbooks
+          git checkout ${ANSIBLE_PLAYBOOK_BRANCH}
+
+          PLAYBOOK_COMMIT=$(git rev-parse HEAD)
+          echo "playbook_commit=${PLAYBOOK_COMMIT}" >> $GITHUB_ENV
+          echo "✅ Playbook repository cloned (commit: ${PLAYBOOK_COMMIT})"
+
+          cd ${GITHUB_WORKSPACE}
+
+          # Playbook expects go source at:
+          #   {{ playbook_dir }}/../../ibm-sap-hana-backint-cos
+          #   = ansible-playbooks/ansible/playbooks/../../ibm-sap-hana-backint-cos
+          #   = ansible-playbooks/ibm-sap-hana-backint-cos
+          echo "Creating symbolic link for Go source..."
+          ln -s ${GITHUB_WORKSPACE} ${GITHUB_WORKSPACE}/ansible-playbooks/ibm-sap-hana-backint-cos
+
+          # Verify the symlink resolves correctly
+          if [ -f "${GITHUB_WORKSPACE}/ansible-playbooks/ibm-sap-hana-backint-cos/go.mod" ]; then
+            echo "✅ Go source accessible via symlink (go.mod found)"
+          else
+            echo "❌ Go source NOT found via symlink — build will fail"
+            exit 1
+          fi
+
+          echo "Playbook will resolve go_source_dir to:"
+          realpath ${GITHUB_WORKSPACE}/ansible-playbooks/ansible/playbooks/../../ibm-sap-hana-backint-cos
+
+      # ---------------------------------------------------------------
+      # STAGE 4: Setup SSH and validate infrastructure
+      # ---------------------------------------------------------------
+      - name: Setup SSH Agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.POWER_VM_SSH_KEY }}
+
+      - name: Add jump hosts to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${POWER_VM_IP} >> ~/.ssh/known_hosts 2>/dev/null \
+            || echo "⚠️ ssh-keyscan failed for ${POWER_VM_IP}"
+
+      - name: Setup SSH Key for Power VM
+        env:
+          POWER_VM_SSH_KEY: ${{ secrets.POWER_VM_SSH_KEY }}
+        run: |
+          echo "$POWER_VM_SSH_KEY" > /tmp/power_vm_key
+          chmod 600 /tmp/power_vm_key
+
+      - name: Validate Environment
+        env:
+          IC_API_KEY: ${{ secrets.IC_API_KEY }}
+        run: |
+          echo "Validating environment..."
+
+          # Test Power VM connectivity
+          ssh -i /tmp/power_vm_key \
+            -o StrictHostKeyChecking=no \
+            -o ConnectTimeout=10 \
+            root@${POWER_VM_IP} "echo 'Power VM connection successful'"
+
+          # Test SAP HANA status — fail early if HANA is down
+          ssh -i /tmp/power_vm_key \
+            -o StrictHostKeyChecking=no \
+            root@${POWER_VM_IP} \
+            "su - ${HANA_SID,,}adm -c 'HDB info'"
+
+          # Login to IBM Cloud
+          ibmcloud login --apikey ${IC_API_KEY} -r ${IBM_REGION} -g ${IBM_RESOURCE_GROUP}
+
+          echo "✅ Environment validation complete"
+
+      # ---------------------------------------------------------------
+      # STAGE 5: Build and test
+      # ---------------------------------------------------------------
+      - name: Run Prerequisites Playbook (Builds Binary)
+        env:
+          IC_API_KEY: ${{ secrets.IC_API_KEY }}
+        run: |
+          cd ansible-playbooks
+
+          echo "Running prerequisites playbook..."
+          ansible-playbook ansible/playbooks/playbook_prereqs.yml \
+            --extra-vars "api_key_value=${IC_API_KEY}" \
+            -v
+
+      - name: Run execute-tests Playbook (Executes Tests)
+        if: success()
+        id: execute-tests
+        env:
+          HANA_SYSTEM_PASSWORD: ${{ secrets.HANA_SYSTEM_PASSWORD }}
+        run: |
+          cd ansible-playbooks
+
+          START_TIME=$(date +%s)
+
+          echo "Executing comprehensive backint tests..."
+          ansible-playbook ansible/playbooks/playbook_execute.yml \
+            -i ansible/inventory/power_vm.yml \
+            -v
+
+          END_TIME=$(date +%s)
+          DURATION=$((END_TIME - START_TIME))
+
+          echo "duration=${DURATION}" >> $GITHUB_OUTPUT
+          echo "✅ Tests completed in ${DURATION} seconds"
+
+      # ---------------------------------------------------------------
+      # STAGE 6: Collect results and clean up
+      # ---------------------------------------------------------------
+      - name: Collect Test Results
+        if: always()
+        run: |
+          echo "Collecting test results..."
+          mkdir -p test-results
+
+          if [ -d "ansible-playbooks/artifacts" ]; then
+            cp -r ansible-playbooks/artifacts/* test-results/ || true
+          fi
+
+          cat > test-results/system-info.txt << EOF
+          Weekly Test Run Information
+          ============================
+          Run Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          Release Tag: ${{ steps.get-release.outputs.tag }}
+          Release URL: ${{ steps.get-release.outputs.url }}
+          Playbook Commit: ${playbook_commit}
+          Test Duration: ${{ steps.execute-tests.outputs.duration }} seconds
+          Test Outcome: ${{ steps.execute-tests.outcome }}
+
+          Environment:
+          - Power VM: ${POWER_VM_IP}
+          - SAP HANA: ${HANA_SID}/${HANA_INSTANCE}
+          - COS Region: ${IBM_REGION}
+          - Resource Group: ${IBM_RESOURCE_GROUP}
+          EOF
+
+          cat test-results/system-info.txt
+
+      - name: Upload Test Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backint-test-results-${{ steps.get-release.outputs.tag }}-${{ github.run_number }}
+          path: test-results/
+          retention-days: 14
+
+      - name: Cleanup
+        if: always()
+        run: |
+          echo "Running cleanup..."
+
+          if [ -d "ansible-playbooks" ]; then
+            cd ansible-playbooks
+            ansible-playbook ansible/playbooks/playbook_cleanup.yml \
+              -v || echo "⚠️ Cleanup playbook failed, continuing..."
+          fi
+
+          rm -f /tmp/power_vm_key
+
+          echo "✅ Cleanup complete"
