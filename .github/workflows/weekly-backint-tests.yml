@@ -198,7 +198,13 @@ jobs:
           cd ${GITHUB_WORKSPACE}/release-binary
 
           echo "Extracting..."
-          unzip release.zip || tar xzf release.zip
+          python3 -c "
+          import zipfile, sys
+          with zipfile.ZipFile('release.zip', 'r') as z:
+              z.extractall('.')
+              for name in z.namelist():
+                  print(f'  {name}')
+          "
           echo "✅ Extracted"
 
           echo "=== Contents ==="
