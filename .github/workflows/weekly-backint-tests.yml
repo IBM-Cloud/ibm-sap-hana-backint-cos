@@ -115,69 +115,55 @@ jobs:
 
       - name: Debug - Inspect release
         env:
-          GH_TOKEN: ${{ secrets.GHE_PAT }}
+          PUBLIC_GITHUB_PAT: ${{ secrets.PUBLIC_GITHUB_PAT }}
         run: |
           RELEASE_TAG="${{ steps.get-release.outputs.tag }}"
           REPO="IBM-Cloud/ibm-sap-hana-backint-cos"
 
-          echo "=== Release Info ==="
-          echo "Tag: ${RELEASE_TAG}"
-          echo "Repo: ${REPO}"
-          echo ""
-
-          echo "=== Full API Response ==="
           curl -s \
-            -H "Authorization: token ${GH_TOKEN}" \
+            -H "Authorization: token ${PUBLIC_GITHUB_PAT}" \
             "https://api.github.com/repos/${REPO}/releases/tags/${RELEASE_TAG}" | python3 -c "
           import sys, json
           data = json.load(sys.stdin)
           print('Release Name:', data.get('name', 'N/A'))
           print('Tag:', data.get('tag_name', 'N/A'))
-          print('Message:', data.get('message', 'N/A'))
           print('Zipball URL:', data.get('zipball_url', 'N/A'))
-          print('Tarball URL:', data.get('tarball_url', 'N/A'))
           assets = data.get('assets', [])
           if not assets:
-              print('⚠️  No assets attached to this release')
+              print('No assets attached to this release')
           else:
               print(f'Assets ({len(assets)}):')
               for a in assets:
                   print(f'  - Name: {a[\"name\"]}')
                   print(f'    Type: {a[\"content_type\"]}')
                   print(f'    Size: {a[\"size\"]} bytes')
-                  print(f'    URL:  {a[\"url\"]}')
                   print(f'    Download URL: {a[\"browser_download_url\"]}')
           "
 
       - name: Get release asset URL
         env:
-          GH_TOKEN: ${{ secrets.GHE_PAT }}
+          PUBLIC_GITHUB_PAT: ${{ secrets.PUBLIC_GITHUB_PAT }}
         run: |
           RELEASE_TAG="${{ steps.get-release.outputs.tag }}"
           REPO="IBM-Cloud/ibm-sap-hana-backint-cos"
 
-          # Try to get asset URL - check for .zip first, then fall back to zipball
           ASSET_URL=$(curl -s \
-            -H "Authorization: token ${GH_TOKEN}" \
+            -H "Authorization: token ${PUBLIC_GITHUB_PAT}" \
             "https://api.github.com/repos/${REPO}/releases/tags/${RELEASE_TAG}" \
             | python3 -c "
           import sys, json
           data = json.load(sys.stdin)
           assets = data.get('assets', [])
-          # Check for uploaded zip asset
           for a in assets:
               if a['name'].endswith('.zip'):
                   print(a['url'])
                   sys.exit(0)
-          # No zip asset — try any asset
           for a in assets:
               print(a['url'])
               sys.exit(0)
-          # No assets at all — fall back to source zipball
           zipball = data.get('zipball_url', '')
           if zipball:
               print('ZIPBALL:' + zipball)
-              sys.exit(0)
           ")
 
           echo "Resolved URL: ${ASSET_URL}"
@@ -185,31 +171,25 @@ jobs:
 
       - name: Download release
         env:
-          GH_TOKEN: ${{ secrets.GHE_PAT }}
+          PUBLIC_GITHUB_PAT: ${{ secrets.PUBLIC_GITHUB_PAT }}
         run: |
           mkdir -p ${GITHUB_WORKSPACE}/release-binary
           ASSET_URL="${{ env.asset_url }}"
 
-          echo "Downloading from: ${ASSET_URL}"
-
           if [[ "${ASSET_URL}" == ZIPBALL:* ]]; then
-            # Source zipball (no uploaded assets)
             REAL_URL="${ASSET_URL#ZIPBALL:}"
-            echo "Using source zipball: ${REAL_URL}"
             curl -L \
-              -H "Authorization: token ${GH_TOKEN}" \
+              -H "Authorization: token ${PUBLIC_GITHUB_PAT}" \
               -o ${GITHUB_WORKSPACE}/release-binary/release.zip \
               "${REAL_URL}"
           else
-            # Uploaded asset
             curl -L \
-              -H "Authorization: token ${GH_TOKEN}" \
+              -H "Authorization: token ${PUBLIC_GITHUB_PAT}" \
               -H "Accept: application/octet-stream" \
               -o ${GITHUB_WORKSPACE}/release-binary/release.zip \
               "${ASSET_URL}"
           fi
 
-          echo "Downloaded file info:"
           ls -la ${GITHUB_WORKSPACE}/release-binary/release.zip
           file ${GITHUB_WORKSPACE}/release-binary/release.zip
 
