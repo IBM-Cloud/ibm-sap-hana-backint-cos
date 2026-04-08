@@ -186,7 +186,7 @@ jobs:
       # STAGE 4: Setup SSH and validate infrastructure
       # ---------------------------------------------------------------
       - name: Setup SSH Agent
-        uses: webfactory/ssh-agent@v0.9.0
+        uses: webfactory/ssh-agent@v0.10.0
         with:
           ssh-private-key: ${{ secrets.POWER_VM_SSH_KEY }}
 
@@ -295,7 +295,7 @@ jobs:
 
       - name: Upload Test Artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backint-test-results-${{ steps.get-release.outputs.tag }}-${{ github.run_number }}
           path: test-results/
