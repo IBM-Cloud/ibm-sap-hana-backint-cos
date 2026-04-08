@@ -62,7 +62,6 @@ This implementation supports **regional endpoints only** and requires object ver
 - **Existing Bucket**: A bucket must be created within the COS instance.
 - **Regional Resiliency**: Bucket must use **Regional resiliency location only**.
   - ❌ Cross Region resiliency is **not supported**.
-  - ❌ Single data center is **not supported**.
 - **Object Versioning**: Must be **enabled** on the bucket.
 - **Object Lock**: Must be **enabled** on the bucket.
 - **Endpoint Type**: Use **direct endpoints only** for optimal performance.
