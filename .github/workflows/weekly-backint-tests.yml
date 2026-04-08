@@ -34,7 +34,7 @@ jobs:
       # STAGE 1: Prepare source code
       # ---------------------------------------------------------------
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
