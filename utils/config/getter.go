@@ -119,7 +119,7 @@ func (b BackintConfigT) ObjectLockLegalHoldStatus() string {
 Getting the object lock retention mode
 */
 func (b BackintConfigT) ObjectLockRetentionMode() string {
-	return b.Get("object_lock_retention_mode")
+	return strings.ToLower(b.Get("object_lock_retention_mode"))
 }
 
 /*
@@ -152,11 +152,7 @@ Getting the max concurrency for recovery
 If set to 0, we take the value from max_concurrency
 */
 func (b BackintConfigT) RecoverMaxConcurrency() int {
-	rmc := global.ToInteger(b.Get("recover_max_concurrency"))
-	if rmc == 0 {
-		return global.ToInteger(b.Get("max_concurrency"))
-	}
-	return rmc
+	return global.ToInteger(b.Get("recover_max_concurrency"))
 }
 
 /*

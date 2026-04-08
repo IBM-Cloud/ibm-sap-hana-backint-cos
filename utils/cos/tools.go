@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/config"
@@ -64,8 +65,10 @@ func setupUploadInputInfo(
 	tags := config.BackintConfig.Tags()
 	var pLockMode *string
 	var pLockDate *time.Time
-	if config.BackintConfig.ObjectLockRetentionMode() == "cmp" {
-		lockMode := global.OBJECTLOCKMODE
+
+	objectLockMode := config.BackintConfig.ObjectLockRetentionMode()
+	if objectLockMode != global.LOCKMODE_NONE {
+		lockMode := global.OBJECTLOCKMODES[objectLockMode]
 		lockDate := config.BackintConfig.ObjectLockRetentionDate()
 		pLockMode = &lockMode
 		pLockDate = &lockDate
@@ -141,6 +144,22 @@ func generateDownloadParts(
 }
 
 /*
+Get or create a mutex for a specific pipe
+*/
+func getPipeWriteMutex(pipeName string) *sync.Mutex {
+	pipeWriteMutexesLock.Lock()
+	defer pipeWriteMutexesLock.Unlock()
+
+	if mutex, exists := pipeWriteMutexes[pipeName]; exists {
+		return mutex
+	}
+
+	mutex := &sync.Mutex{}
+	pipeWriteMutexes[pipeName] = mutex
+	return mutex
+}
+
+/*
 Trying to write downloaded part to pipe.
 If the next part in the row is already stored in downloadedParts, write it to pipe,
 increase the nextIndex counter and
@@ -159,6 +178,9 @@ func sendDataToHANA(fifo *os.File,
 	buffer *bytes.Buffer,
 ) bool {
 
+	pipeName := fifo.Name()
+	pipeMutex := getPipeWriteMutex(pipeName)
+
 	writeToPipeLock.Lock()
 
 	// Storing data into buffer
@@ -166,14 +188,14 @@ func sendDataToHANA(fifo *os.File,
 
 	global.Logger.Debug(fmt.Sprintf(
 		"'%s': Writing part #%d to buffer, nextIndex = %d.",
-		fifo.Name(),
+		pipeName,
 		index,
 		*nextIndex,
 	))
 
 	global.Logger.Debug(fmt.Sprintf(
 		"'%s': downloadedParts length: %d",
-		fifo.Name(),
+		pipeName,
 		len(*downloadedParts),
 	))
 
@@ -182,33 +204,44 @@ func sendDataToHANA(fifo *os.File,
 	for {
 		writeToPipeLock.Lock()
 
-		data := getBufferedDataForIndex(downloadedParts, nextIndex, fifo.Name())
+		data := getBufferedDataForIndex(downloadedParts, nextIndex, pipeName)
 		if data == nil {
 			writeToPipeLock.Unlock()
 			break
 		}
 
+		currentIndex := *nextIndex
+
 		global.Logger.Debug(fmt.Sprintf(
 			"'%s': Writing part #%d to pipe",
-			fifo.Name(),
-			*nextIndex,
+			pipeName,
+			currentIndex,
 		))
 
-		if !writeDataToPipe(fifo, data, nextIndex, pipeBufferSize) {
-			writeToPipeLock.Unlock()
-			return false
-		}
+		// Copy data before releasing buffer lock
+		dataCopy := make([]byte, len(data))
+		copy(dataCopy, data)
 
-		deleteBufferedDataForIndex(downloadedParts, nextIndex, fifo.Name())
-
+		deleteBufferedDataForIndex(downloadedParts, nextIndex, pipeName)
 		*nextIndex++
 
 		global.Logger.Debug(fmt.Sprintf(
 			"'%s': Increased nextIndex to #%d",
-			fifo.Name(),
+			pipeName,
 			*nextIndex,
 		))
+
+		// Release buffer lock BEFORE acquiring pipe mutex
 		writeToPipeLock.Unlock()
+
+		// Acquire pipe-specific mutex to serialize writes to this pipe only
+		pipeMutex.Lock()
+		success := writeDataToPipe(fifo, dataCopy, &currentIndex, pipeBufferSize)
+		pipeMutex.Unlock()
+
+		if !success {
+			return false
+		}
 	}
 	return true
 }
@@ -227,25 +260,27 @@ func writeDataToPipe(fifo *os.File, data []byte, nextIndex *int64, pipeBufferSiz
 		end := min(i+pipeBufferSize, len(data))
 
 		// Setting the timeout for the Write statement
+		// Increased timeout to handle slow HANA reads during heavy processing
 		ctx, cancel := context.WithTimeout(
 			context.Background(),
-			time.Duration(30)*time.Second,
+			time.Duration(300)*time.Second,
 		)
-		defer cancel()
 
 		written := make(chan error, 1)
 
+		// Capture loop variables to avoid closure issues
+		start := i
+		chunkEnd := end
+
 		go func() {
-			_, err := fifo.Write(data[i:end])
-			time.Sleep(
-				time.Duration(config.BackintConfig.Timeout()) * time.Microsecond,
-			)
+			_, err := fifo.Write(data[start:chunkEnd])
 			written <- err
 		}()
 
 		select {
 		case <-ctx.Done():
 			// Timeout writing to pipe
+			cancel() // Cancel the context immediately
 			global.Logger.Error(fmt.Sprintf(
 				"Error writing part #%d to pipe '%s': %s",
 				*nextIndex,
@@ -256,6 +291,7 @@ func writeDataToPipe(fifo *os.File, data []byte, nextIndex *int64, pipeBufferSiz
 			os.Exit(1)
 			// return false
 		case err := <-written:
+			cancel() // Cancel the context after successful write
 			if err != nil {
 				global.Logger.Error(fmt.Sprintf(
 					"'%s': Error writing part #%d to pipe: %s",
