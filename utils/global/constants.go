@@ -55,8 +55,17 @@ const (
 	WRONG_PARAMETER = 2
 )
 
-// Values for comparison with parameter file settings
-const OBJECTLOCKMODE string = "COMPLIANCE"
+// Values for object_lock_retention_mode
+const (
+	LOCKMODE_CMP  = "cmp"
+	LOCKMODE_GOV  = "gov"
+	LOCKMODE_NONE = "none"
+)
+
+var OBJECTLOCKMODES = map[string]string{
+	LOCKMODE_CMP: "COMPLIANCE",
+	LOCKMODE_GOV: "GOVERNANCE",
+}
 
 // Default pipe buffer size used for recovery in case
 // the system call to get the buffer size produces an error

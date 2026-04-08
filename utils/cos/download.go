@@ -96,13 +96,11 @@ func Download(s3Client *s3.S3, element CosObject) Result {
 	}
 
 	// Waiting for all processes to finish
-	go func(key string) {
-		global.Logger.Debug(fmt.Sprintf(
-			"'%s': Waiting for processes to finish.", key,
-		))
-		wgGetObject.Wait()
-		close(downloadPartsResults)
-	}(element.Key)
+	global.Logger.Debug(fmt.Sprintf(
+		"'%s': Waiting for processes to finish.", element.Key,
+	))
+	wgGetObject.Wait()
+	close(downloadPartsResults)
 
 	endTime := time.Now()
 	duration := endTime.Sub(startTime).Seconds()
@@ -157,6 +155,7 @@ func runDownloadSinglePart(
 			downloadSingle.downloadPart.numParts,
 			downloadSingle.downloadPart.Key),
 	)
+
 	input := s3.GetObjectInput{
 		Bucket:     aws.String(config.BackintConfig.BucketName()),
 		Key:        aws.String(downloadSingle.downloadPart.Key),
@@ -164,47 +163,82 @@ func runDownloadSinglePart(
 		Range:      aws.String(downloadSingle.downloadPart.byteRange),
 	}
 
-	response, err := s3Client.GetObject(&input)
+	// Retry logic for network timeouts
+	maxRetries := 3
+	var response *s3.GetObjectOutput
+	var err error
+	var buf *bytes.Buffer
 
-	global.Logger.Debug(
-		fmt.Sprintf("Finished downloading part number '%d' of '%d' for key '%s'.",
-			downloadSingle.downloadPart.partNumber,
-			downloadSingle.downloadPart.numParts,
-			downloadSingle.downloadPart.Key,
-		),
-	)
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		response, err = s3Client.GetObject(&input)
 
-	if err != nil {
-		global.Logger.Error(
-			fmt.Sprintf("'%s': Error downloading part with number '%d'.",
+		if err != nil {
+			if attempt < maxRetries {
+				global.Logger.Warning(fmt.Sprintf(
+					"'%s': Error downloading part #%d (attempt %d/%d): %s. Retrying...",
+					downloadSingle.downloadPart.Key,
+					downloadSingle.downloadPart.partNumber,
+					attempt,
+					maxRetries,
+					err,
+				))
+				time.Sleep(time.Duration(attempt) * time.Second) // Exponential backoff
+				continue
+			}
+			global.Logger.Error(
+				fmt.Sprintf("'%s': Error downloading part with number '%d' after %d attempts.",
+					downloadSingle.downloadPart.Key,
+					downloadSingle.downloadPart.partNumber,
+					maxRetries,
+				))
+			results <- DownloadPartResult{
+				partNumber: downloadSingle.downloadPart.partNumber,
+				err:        err,
+			}
+			return
+		}
+
+		// Try to copy data to buffer
+		buf = new(bytes.Buffer)
+		_, err = io.Copy(buf, response.Body)
+		_ = response.Body.Close()
+
+		if err != nil {
+			if attempt < maxRetries {
+				global.Logger.Warning(fmt.Sprintf(
+					"'%s': Could not copy data to buffer for part #%d (attempt %d/%d): %s. Retrying...",
+					downloadSingle.downloadPart.Key,
+					downloadSingle.downloadPart.partNumber,
+					attempt,
+					maxRetries,
+					err,
+				))
+				time.Sleep(time.Duration(attempt) * time.Second) // Exponential backoff
+				continue
+			}
+			global.Logger.Error(fmt.Sprintf(
+				"'%s': Could not copy data to buffer for part #%d after %d attempts. Error: %s",
 				downloadSingle.downloadPart.Key,
 				downloadSingle.downloadPart.partNumber,
+				maxRetries,
+				err,
 			))
-		results <- DownloadPartResult{
-			partNumber: downloadSingle.downloadPart.partNumber,
-			err:        err,
+			results <- DownloadPartResult{
+				partNumber: downloadSingle.downloadPart.partNumber,
+				err:        err,
+			}
+			return
 		}
-		return
-	}
 
-	defer func() {
-		_ = response.Body.Close()
-	}()
-
-	buf := new(bytes.Buffer)
-	_, err = io.Copy(buf, response.Body)
-
-	if err != nil {
-		global.Logger.Error(fmt.Sprintf(
-			"'%s': Could not copy data to buffer. Error: %s",
-			downloadSingle.downloadPart.Key,
-			err,
-		))
-		results <- DownloadPartResult{
-			partNumber: downloadSingle.downloadPart.partNumber,
-			err:        err,
-		}
-		return
+		// Success - break out of retry loop
+		global.Logger.Debug(
+			fmt.Sprintf("Finished downloading part number '%d' of '%d' for key '%s'.",
+				downloadSingle.downloadPart.partNumber,
+				downloadSingle.downloadPart.numParts,
+				downloadSingle.downloadPart.Key,
+			),
+		)
+		break
 	}
 
 	if *(downloadSingle.nextIndex) > downloadSingle.downloadPart.numParts {
