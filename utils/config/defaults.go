@@ -60,6 +60,7 @@ var region = Default{
 		"eu-de",
 		"eu-es",
 		"eu-gb",
+		"in-che",
 		"jp-osa",
 		"jp-tok",
 		"us-east",
