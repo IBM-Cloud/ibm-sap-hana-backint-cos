@@ -508,7 +508,7 @@ Validating object lock retention
 func validateLockRetention(basicConfig []Default) {
 	if isObjectLockRetentionMode(basicConfig) {
 		if !isObjectLockRetentionPeriod(basicConfig) {
-			message := fmt.Sprintf("%s: You specified 'object_lock_retention_mode = cmp', "+
+			message := fmt.Sprintf("%s: You specified 'cmp' or 'gov' for 'object_lock_retention_mode', "+
 				"but no 'object_lock_retention_period' is specified.",
 				VALIDATION_ERROR,
 			)
@@ -539,7 +539,8 @@ Returns true if object_lock_retention_mode is set
 */
 func isObjectLockRetentionMode(basicConfig []Default) bool {
 	b := getObjForKey(basicConfig, "object_lock_retention_mode")
-	return b.configValue == "cmp"
+	val := strings.ToLower(b.configValue)
+	return (val == global.LOCKMODE_CMP || val == global.LOCKMODE_GOV)
 }
 
 /*
