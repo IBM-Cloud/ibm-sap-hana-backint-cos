@@ -1,3 +1,10 @@
+# 1.1.0 (April 8, 2026)
+
+## **New Features**
+
+* **Added in-che Region Support**
+  Added support for the in-che (Chennai, India) region.
+
 # 1.0.0 (March 31, 2026)
 
 ## **Critical Fixes**
