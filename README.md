@@ -126,7 +126,7 @@ wget https://github.com/IBM-Cloud/ibm-sap-hana-backint-cos/releases/download/v${
 
 **Or download a specific version:**
 ```bash
-VERSION=1.0.0  # Replace with desired version
+VERSION=1.1.0  # Replace with desired version
 wget https://github.com/IBM-Cloud/ibm-sap-hana-backint-cos/releases/download/v${VERSION}/ibm-sap-hana-backint-cos_${VERSION}_linux_ppc64le.zip
 ```
 
