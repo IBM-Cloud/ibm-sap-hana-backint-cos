@@ -1,9 +1,16 @@
+# 1.2.0 (April 9, 2026)
+
+## **New Features**
+
+* **in-mum Region Support**
+  Added support for IBM Cloud Object Storage Mumbai (in-mum) datacenter region
+
 # 1.1.0 (April 8, 2026)
 
 ## **New Features**
 
-* **Added in-che Region Support**
-  Added support for the in-che (Chennai, India) region.
+* **in-che Region Support**
+  Added support for IBM Cloud Object Storage Chennai (in-che) datacenter region
 
 # 1.0.0 (March 31, 2026)
 

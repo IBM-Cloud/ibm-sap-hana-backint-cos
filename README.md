@@ -125,7 +125,7 @@ wget https://github.com/IBM-Cloud/ibm-sap-hana-backint-cos/releases/download/v${
 
 **Or download a specific version:**
 ```bash
-VERSION=1.1.0  # Replace with desired version
+VERSION=1.2.0  # Replace with desired version
 wget https://github.com/IBM-Cloud/ibm-sap-hana-backint-cos/releases/download/v${VERSION}/ibm-sap-hana-backint-cos_${VERSION}_linux_ppc64le.zip
 ```
 
@@ -190,7 +190,7 @@ Place the configuration file in a directory accessible by SAP HANA, preferably:
 | `auth_mode`          | `apikey`                                                                                                                        | ✅ Yes   | Authentication method (currently only apikey supported).                                                                         |
 | `auth_keypath`       | `<file_path>`                                                                                                                   | ✅ Yes   | Full path to file containing IBM Cloud API key.                                                                                  |
 | `bucket`             | `<bucket_name>`                                                                                                                 | ✅ Yes   | Name of IBM Cloud Object Storage bucket.                                                                                         |
-| `region`             | `au-syd`, `br-sao`, `ca-tor`, `eu-de`, `eu-es`, `eu-gb`, `in-che`, `jp-osa`, `jp-tok`, `us-east`, `us-south`                            | ✅ Yes   | Region of the COS bucket.                                                                                                        |
+| `region`             | `au-syd`, `br-sao`, `ca-tor`, `eu-de`, `eu-es`, `eu-gb`, `in-che`, `in-mum`, `jp-osa`, `jp-tok`, `us-east`, `us-south`                            | ✅ Yes   | Region of the COS bucket.                                                                                                        |
 | `endpoint_url`       | `<endpoint_url>`                                                                                                                | ✅ Yes   | Regional **direct** endpoint URL for the COS bucket (e.g., `https://s3.direct.us-south.cloud-object-storage.appdomain.cloud`).  |
 | `ibm_auth_endpoint`  | `https://private.iam.cloud.ibm.com/identity/token` or `https://iam.cloud.ibm.com/identity/token`                               | ⬜ No    | IAM authentication endpoint<br>**Default**: `https://private.iam.cloud.ibm.com/identity/token`                                   |
 
