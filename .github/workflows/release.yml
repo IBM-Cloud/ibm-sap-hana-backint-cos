@@ -1,5 +1,7 @@
-# This GitHub action can publish assets for release when a tag is created.
-# Currently its setup to run on any tag that matches the pattern "v*" (ie. v0.1.0).
+# This GitHub action automatically creates releases based on conventional commits.
+# - Commits with "fix:" prefix trigger a patch version bump (x.x.X)
+# - Commits with "feat:" prefix trigger a minor version bump (x.X.x)
+# - Commits with "BREAKING CHANGE:" or "!" trigger a major version bump (X.x.x)
 #
 # This uses an action (paultyng/ghaction-import-gpg) that assumes you set your
 # private key in the `GPG_PRIVATE_KEY` secret and passphrase in the `PASSPHRASE`
@@ -13,25 +15,81 @@ name: release
 permissions:
   contents: write
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_run:
+    workflows: ["Go CI"]
+    types:
+      - completed
+    branches:
+      - main
 jobs:
   goreleaser:
     runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Unshallow
-        run: git fetch --prune --unshallow
+      - name: Determine version bump
+        id: version
+        run: |
+          # Get the latest tag
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "Latest tag: $LATEST_TAG"
+
+          # Get commit message
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          echo "Commit message: $COMMIT_MSG"
+
+          # Parse current version
+          CURRENT_VERSION=${LATEST_TAG#v}
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+
+          # Determine version bump based on commit message
+          if echo "$COMMIT_MSG" | grep -qE "^(feat|feature)(\(.+\))?!:|BREAKING CHANGE:"; then
+            # Major version bump for breaking changes
+            MAJOR=$((MAJOR + 1))
+            MINOR=0
+            PATCH=0
+            BUMP_TYPE="major"
+          elif echo "$COMMIT_MSG" | grep -qE "^(feat|feature)(\(.+\))?:"; then
+            # Minor version bump for features
+            MINOR=$((MINOR + 1))
+            PATCH=0
+            BUMP_TYPE="minor"
+          elif echo "$COMMIT_MSG" | grep -qE "^fix(\(.+\))?:"; then
+            # Patch version bump for fixes
+            PATCH=$((PATCH + 1))
+            BUMP_TYPE="patch"
+          else
+            echo "No conventional commit prefix found (fix:, feat:, or BREAKING CHANGE:)"
+            echo "Skipping release"
+            echo "skip=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          NEW_VERSION="v${MAJOR}.${MINOR}.${PATCH}"
+          echo "New version: $NEW_VERSION (${BUMP_TYPE} bump)"
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "skip=false" >> $GITHUB_OUTPUT
+
+      - name: Create and push tag
+        if: steps.version.outputs.skip != 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a ${{ steps.version.outputs.new_version }} -m "Release ${{ steps.version.outputs.new_version }}"
+          git push origin ${{ steps.version.outputs.new_version }}
 
       - name: Set up Go
+        if: steps.version.outputs.skip != 'true'
         uses: actions/setup-go@v5
         with:
           go-version: "1.25.0"
 
       - name: Run GoReleaser
+        if: steps.version.outputs.skip != 'true'
         uses: goreleaser/goreleaser-action@v6
         with:
           version: latest

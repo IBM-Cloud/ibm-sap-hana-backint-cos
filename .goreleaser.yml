@@ -16,7 +16,7 @@ builds:
       - linux
     goarch:
       - ppc64le
-    binary: "{{ .ProjectName }}_v{{ .Version }}"
+    binary: "hdbbackint"
 archives:
   - formats: ["zip"]
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
