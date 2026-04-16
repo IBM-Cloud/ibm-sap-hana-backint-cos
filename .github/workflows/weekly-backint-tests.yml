@@ -21,10 +21,11 @@ env:
   HANA_SID: "BHB"
   HANA_INSTANCE: "10"
   POWER_VM_IP: "10.80.3.21"
+  SHARED_DIR: /var/tmp/backint-ci/${{ github.run_id }}
 
 jobs:
   # ==================================================================
-  # JOB 1: Prepare source + install dependencies (Stages 1 & 2)
+  # JOB 1: Prepare source + install dependencies
   # ==================================================================
   prepare:
     name: Prepare & Install Dependencies
@@ -43,6 +44,11 @@ jobs:
           sudo chown -R $(whoami):$(whoami) "${GITHUB_WORKSPACE}" 2>/dev/null || true
           rm -rf "${GITHUB_WORKSPACE}"/* "${GITHUB_WORKSPACE}"/.[!.]* 2>/dev/null || true
           echo "✅ Workspace cleaned"
+
+      - name: Create shared directory
+        run: |
+          mkdir -p "${SHARED_DIR}"
+          echo "✅ Shared dir ready: ${SHARED_DIR}"
 
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -137,25 +143,25 @@ jobs:
           ")
           echo "asset_url=${ASSET_URL}" >> $GITHUB_OUTPUT
 
-      - name: Download release
+      - name: Download release into shared dir
         env:
           PUBLIC_GITHUB_PAT: ${{ secrets.PUBLIC_GITHUB_PAT }}
           ASSET_URL: ${{ steps.asset-url.outputs.asset_url }}
         run: |
-          mkdir -p ${GITHUB_WORKSPACE}/release-binary
+          mkdir -p "${SHARED_DIR}/release-binary"
           if [[ "${ASSET_URL}" == ZIPBALL:* ]]; then
             REAL_URL="${ASSET_URL#ZIPBALL:}"
             curl -L -H "Authorization: token ${PUBLIC_GITHUB_PAT}" \
-              -o ${GITHUB_WORKSPACE}/release-binary/release.zip "${REAL_URL}"
+              -o "${SHARED_DIR}/release-binary/release.zip" "${REAL_URL}"
           else
             curl -L -H "Authorization: token ${PUBLIC_GITHUB_PAT}" \
               -H "Accept: application/octet-stream" \
-              -o ${GITHUB_WORKSPACE}/release-binary/release.zip "${ASSET_URL}"
+              -o "${SHARED_DIR}/release-binary/release.zip" "${ASSET_URL}"
           fi
 
       - name: Extract release
         run: |
-          cd ${GITHUB_WORKSPACE}/release-binary
+          cd "${SHARED_DIR}/release-binary"
           python3 -c "
           import zipfile
           with zipfile.ZipFile('release.zip', 'r') as z:
@@ -167,11 +173,11 @@ jobs:
         run: |
           RELEASE_TAG="${{ steps.get-release.outputs.tag }}"
           RELEASE_COMMIT=$(git rev-parse HEAD)
-          BINARY_PATH=$(find ${GITHUB_WORKSPACE}/release-binary -name "hdbbackint" -type f | head -1)
+          BINARY_PATH=$(find "${SHARED_DIR}/release-binary" -name "hdbbackint" -type f | head -1)
 
           if [ -z "${BINARY_PATH}" ]; then
             echo "❌ hdbbackint binary not found"
-            find ${GITHUB_WORKSPACE}/release-binary -type f
+            find "${SHARED_DIR}/release-binary" -type f
             exit 1
           fi
           chmod +x "${BINARY_PATH}"
@@ -179,13 +185,6 @@ jobs:
           echo "version=${RELEASE_TAG}" >> $GITHUB_OUTPUT
           echo "commit=${RELEASE_COMMIT}" >> $GITHUB_OUTPUT
           echo "✅ Binary ready: ${BINARY_PATH}"
-
-      - name: Upload release binary artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-binary
-          path: release-binary/
-          retention-days: 2
 
       - name: Install Dependencies
         run: |
@@ -202,7 +201,7 @@ jobs:
           echo "✅ Dependencies ready"
 
   # ==================================================================
-  # JOB 2: Clone Ansible playbooks (Stage 3)
+  # JOB 2: Clone Ansible playbooks
   # ==================================================================
   clone-playbooks:
     name: Clone Ansible Playbooks
@@ -217,25 +216,17 @@ jobs:
         env:
           GHE_PAT: ${{ secrets.GHE_PAT }}
         run: |
-          echo "Cloning ansible-playbooks-backint repository..."
-          git clone https://${GHE_PAT}@${ANSIBLE_PLAYBOOK_REPO}.git ansible-playbooks
-          cd ansible-playbooks
+          mkdir -p "${SHARED_DIR}"
+          rm -rf "${SHARED_DIR}/ansible-playbooks"
+          git clone https://${GHE_PAT}@${ANSIBLE_PLAYBOOK_REPO}.git "${SHARED_DIR}/ansible-playbooks"
+          cd "${SHARED_DIR}/ansible-playbooks"
           git checkout ${ANSIBLE_PLAYBOOK_BRANCH}
-
           PLAYBOOK_COMMIT=$(git rev-parse HEAD)
-          echo "playbook_commit=${PLAYBOOK_COMMIT}" >> $GITHUB_ENV
-          echo "✅ Playbook repository cloned (commit: ${PLAYBOOK_COMMIT})"
-
-      - name: Upload playbooks artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ansible-playbooks
-          path: ansible-playbooks/
-          retention-days: 2
-          include-hidden-files: true
+          echo "commit=${PLAYBOOK_COMMIT}" >> $GITHUB_OUTPUT
+          echo "✅ Cloned to ${SHARED_DIR}/ansible-playbooks (commit: ${PLAYBOOK_COMMIT})"
 
   # ==================================================================
-  # JOB 3: Setup SSH + validate environment (Stage 4)
+  # JOB 3: Setup SSH + validate environment
   # ==================================================================
   validate:
     name: Validate Environment
@@ -278,7 +269,7 @@ jobs:
           echo "✅ Environment validation complete"
 
   # ==================================================================
-  # JOB 4: Run prerequisites + execute tests (Stage 5)
+  # JOB 4: Run prerequisites + execute tests
   # ==================================================================
   test:
     name: Build & Test
@@ -289,22 +280,23 @@ jobs:
       duration: ${{ steps.execute-tests.outputs.duration }}
       test_outcome: ${{ steps.execute-tests.outcome }}
     steps:
-      - name: Download release binary
-        uses: actions/download-artifact@v4
-        with:
-          name: release-binary
-          path: release-binary/
-
-      - name: Download playbooks
-        uses: actions/download-artifact@v4
-        with:
-          name: ansible-playbooks
-          path: ansible-playbooks/
+      - name: Verify shared dir contents
+        run: |
+          echo "Checking shared directory: ${SHARED_DIR}"
+          if [ ! -d "${SHARED_DIR}/ansible-playbooks" ]; then
+            echo "❌ Playbooks dir missing: ${SHARED_DIR}/ansible-playbooks"
+            exit 1
+          fi
+          if [ ! -d "${SHARED_DIR}/release-binary" ]; then
+            echo "❌ Release binary dir missing: ${SHARED_DIR}/release-binary"
+            exit 1
+          fi
+          echo "✅ Shared dir has expected contents"
 
       - name: Resolve binary path
         id: resolve-binary
         run: |
-          BINARY_PATH=$(find ${GITHUB_WORKSPACE}/release-binary -name "hdbbackint" -type f | head -1)
+          BINARY_PATH=$(find "${SHARED_DIR}/release-binary" -name "hdbbackint" -type f | head -1)
           chmod +x "${BINARY_PATH}"
           echo "path=${BINARY_PATH}" >> $GITHUB_OUTPUT
 
@@ -329,7 +321,7 @@ jobs:
         env:
           IC_API_KEY: ${{ secrets.IC_API_KEY }}
         run: |
-          cd ansible-playbooks
+          cd "${SHARED_DIR}/ansible-playbooks"
           ansible-playbook ansible/playbooks/playbook_prereqs.yml \
             --extra-vars "api_key_value=${IC_API_KEY}" \
             --extra-vars "skip_binary_build=true" \
@@ -343,7 +335,7 @@ jobs:
         env:
           HANA_SYSTEM_PASSWORD: ${{ secrets.HANA_SYSTEM_PASSWORD }}
         run: |
-          cd ansible-playbooks
+          cd "${SHARED_DIR}/ansible-playbooks"
           START_TIME=$(date +%s)
           ansible-playbook ansible/playbooks/playbook_execute.yml \
             -i ansible/inventory/power_vm.yml -v
@@ -353,7 +345,7 @@ jobs:
           echo "✅ Tests completed in ${DURATION} seconds"
 
   # ==================================================================
-  # JOB 5: Summarize run (Stage 6 - summary half)
+  # JOB 5: Summarize run
   # ==================================================================
   summarize:
     name: Summarize Run
@@ -381,7 +373,7 @@ jobs:
           echo "  Resource Group: ${IBM_RESOURCE_GROUP}"
 
   # ==================================================================
-  # JOB 6: Cleanup (Stage 6 - cleanup half)
+  # JOB 6: Cleanup
   # ==================================================================
   cleanup:
     name: Cleanup
@@ -390,12 +382,6 @@ jobs:
     if: always() && needs.clone-playbooks.result == 'success'
     timeout-minutes: 15
     steps:
-      - name: Download playbooks
-        uses: actions/download-artifact@v4
-        with:
-          name: ansible-playbooks
-          path: ansible-playbooks/
-
       - name: Setup SSH Agent
         uses: webfactory/ssh-agent@v0.9.0
         with:
@@ -405,10 +391,28 @@ jobs:
         env:
           IC_API_KEY: ${{ secrets.IC_API_KEY }}
         run: |
-          ibmcloud login --apikey ${IC_API_KEY} -r ${IBM_REGION} -g ${IBM_RESOURCE_GROUP} || true
-          cd ansible-playbooks
-          ansible-playbook ansible/playbooks/playbook_cleanup.yml \
-            --extra-vars "api_key_value=${IC_API_KEY}" \
-            -v || echo "⚠️ Cleanup playbook failed, continuing..."
+          if [ ! -d "${SHARED_DIR}/ansible-playbooks" ]; then
+            echo "⚠️ Playbooks dir missing — skipping Ansible cleanup"
+          else
+            ibmcloud login --apikey ${IC_API_KEY} -r ${IBM_REGION} -g ${IBM_RESOURCE_GROUP} || true
+            cd "${SHARED_DIR}/ansible-playbooks"
+            ansible-playbook ansible/playbooks/playbook_cleanup.yml \
+              --extra-vars "api_key_value=${IC_API_KEY}" \
+              -v || echo "⚠️ Cleanup playbook failed, continuing..."
+          fi
           rm -f /tmp/power_vm_key
-          echo "✅ Cleanup complete"
+          echo "✅ Ansible cleanup complete"
+
+      - name: Remove shared directory
+        if: always()
+        run: |
+          sudo chown -R $(whoami):$(whoami) "${SHARED_DIR}" 2>/dev/null || true
+          rm -rf "${SHARED_DIR}"
+          echo "✅ Shared dir removed: ${SHARED_DIR}"
+
+      - name: Prune old shared dirs (older than 7 days)
+        if: always()
+        run: |
+          find /var/tmp/backint-ci -maxdepth 1 -mindepth 1 -type d -mtime +7 \
+            -exec sudo rm -rf {} + 2>/dev/null || true
+          echo "✅ Old shared dirs pruned"
