@@ -351,59 +351,33 @@ jobs:
           echo "duration=${DURATION}" >> $GITHUB_OUTPUT
           echo "✅ Tests completed in ${DURATION} seconds"
 
-      - name: Upload test artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-artifacts
-          path: ansible-playbooks/artifacts/
-          retention-days: 14
-          if-no-files-found: ignore
-
   # ==================================================================
-  # JOB 5: Collect results (Stage 6 - first half)
+  # JOB 5: Summarize run (Stage 6 - summary half)
   # ==================================================================
-  collect:
-    name: Collect Test Results
+  summarize:
+    name: Summarize Run
     runs-on: self-hosted
     needs: [prepare, clone-playbooks, test]
     if: always() && needs.test.result != 'skipped'
-    timeout-minutes: 10
+    timeout-minutes: 5
     steps:
-      - name: Download test artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: test-artifacts
-          path: test-results/
-        continue-on-error: true
-
-      - name: Summarize Run
+      - name: Print run summary
         run: |
-          mkdir -p test-results
-          cat > test-results/system-info.txt << EOF
-          Weekly Test Run Information
-          ============================
-          Run Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-          Release Tag: ${{ needs.prepare.outputs.release_tag }}
-          Release URL: ${{ needs.prepare.outputs.release_url }}
-          Playbook Commit: ${{ needs.clone-playbooks.outputs.playbook_commit }}
-          Test Duration: ${{ needs.test.outputs.duration }} seconds
-          Test Outcome: ${{ needs.test.outputs.test_outcome }}
-
-          Environment:
-          - Power VM: ${POWER_VM_IP}
-          - SAP HANA: ${HANA_SID}/${HANA_INSTANCE}
-          - COS Region: ${IBM_REGION}
-          - Resource Group: ${IBM_RESOURCE_GROUP}
-          EOF
-          cat test-results/system-info.txt
-
-      - name: Upload final results
-        uses: actions/upload-artifact@v4
-        with:
-          name: weekly-test-results
-          path: test-results/
-          retention-days: 30
+          echo "============================"
+          echo "Weekly Test Run Information"
+          echo "============================"
+          echo "Run Date:        $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
+          echo "Release Tag:     ${{ needs.prepare.outputs.release_tag }}"
+          echo "Release URL:     ${{ needs.prepare.outputs.release_url }}"
+          echo "Playbook Commit: ${{ needs.clone-playbooks.outputs.playbook_commit }}"
+          echo "Test Duration:   ${{ needs.test.outputs.duration }} seconds"
+          echo "Test Outcome:    ${{ needs.test.outputs.test_outcome }}"
+          echo ""
+          echo "Environment:"
+          echo "  Power VM:       ${POWER_VM_IP}"
+          echo "  SAP HANA:       ${HANA_SID}/${HANA_INSTANCE}"
+          echo "  COS Region:     ${IBM_REGION}"
+          echo "  Resource Group: ${IBM_RESOURCE_GROUP}"
 
   # ==================================================================
   # JOB 6: Cleanup (Stage 6 - cleanup half)
@@ -411,7 +385,7 @@ jobs:
   cleanup:
     name: Cleanup
     runs-on: self-hosted
-    needs: [clone-playbooks, test, collect]
+    needs: [clone-playbooks, test, summarize]
     if: always() && needs.clone-playbooks.result == 'success'
     timeout-minutes: 15
     steps:
