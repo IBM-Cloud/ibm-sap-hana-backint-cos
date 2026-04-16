@@ -1,5 +1,4 @@
 name: Weekly Backint Tests
-
 on:
   schedule:
     - cron: "0 2 * * 1" # Every Monday at 2 AM UTC
@@ -24,15 +23,26 @@ env:
   POWER_VM_IP: "10.80.3.21"
 
 jobs:
-  weekly-test:
-    name: Weekly Backint Validation
+  # ==================================================================
+  # JOB 1: Prepare source + install dependencies (Stages 1 & 2)
+  # ==================================================================
+  prepare:
+    name: Prepare & Install Dependencies
     runs-on: self-hosted
-    timeout-minutes: 120
-
+    timeout-minutes: 30
+    outputs:
+      release_tag: ${{ steps.get-release.outputs.tag }}
+      release_url: ${{ steps.get-release.outputs.url }}
+      published_at: ${{ steps.get-release.outputs.published_at }}
+      prebuilt_version: ${{ steps.set-binary.outputs.version }}
+      prebuilt_commit: ${{ steps.set-binary.outputs.commit }}
     steps:
-      # ---------------------------------------------------------------
-      # STAGE 1: Prepare source code
-      # ---------------------------------------------------------------
+      - name: Clean workspace before checkout
+        run: |
+          echo "Cleaning workspace: ${GITHUB_WORKSPACE}"
+          rm -rf "${GITHUB_WORKSPACE}"/* "${GITHUB_WORKSPACE}"/.[!.]* 2>/dev/null || true
+          echo "✅ Workspace cleaned"
+
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
@@ -56,7 +66,6 @@ jobs:
           github_output = os.environ["GITHUB_OUTPUT"]
           server_url = os.environ.get("GITHUB_SERVER_URL", "https://github.com")
 
-          # Use correct API base for GitHub Enterprise vs github.com
           if "github.com" in server_url and "github.ibm.com" not in server_url:
               api_base = "https://api.github.com"
           else:
@@ -76,7 +85,6 @@ jobs:
               print("No release tag provided, fetching latest release...")
               api_url = f"{api_base}/repos/{repo}/releases/latest"
               req = urllib.request.Request(api_url, headers=headers)
-
               try:
                   with urllib.request.urlopen(req) as response:
                       release = json.loads(response.read().decode())
@@ -86,61 +94,24 @@ jobs:
                       print(f"Latest release: {tag}")
               except urllib.error.HTTPError as e:
                   if e.code == 404:
-                      print("ERROR: No releases found in this repository.")
-                      print("Please provide a release_tag input.")
+                      print("ERROR: No releases found.")
                       raise SystemExit(1)
                   raise
 
-          # Pass outputs to downstream steps
           with open(github_output, "a") as f:
               f.write(f"tag={tag}\n")
               f.write(f"url={url}\n")
               f.write(f"published_at={published_at}\n")
-
-          print(f"Release tag: {tag}")
-          print(f"Release URL: {url}")
           PYEOF
-
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Checkout Release Tag
         run: |
           RELEASE_TAG="${{ steps.get-release.outputs.tag }}"
-          echo "Checking out release tag: ${RELEASE_TAG}"
           git checkout ${RELEASE_TAG}
-          echo "✅ Release tag checked out successfully"
-
-      - name: Debug - Inspect release
-        env:
-          PUBLIC_GITHUB_PAT: ${{ secrets.PUBLIC_GITHUB_PAT }}
-        run: |
-          RELEASE_TAG="${{ steps.get-release.outputs.tag }}"
-          REPO="IBM-Cloud/ibm-sap-hana-backint-cos"
-
-          curl -s \
-            -H "Authorization: token ${PUBLIC_GITHUB_PAT}" \
-            "https://api.github.com/repos/${REPO}/releases/tags/${RELEASE_TAG}" | python3 -c "
-          import sys, json
-          data = json.load(sys.stdin)
-          print('Release Name:', data.get('name', 'N/A'))
-          print('Tag:', data.get('tag_name', 'N/A'))
-          print('Zipball URL:', data.get('zipball_url', 'N/A'))
-          assets = data.get('assets', [])
-          if not assets:
-              print('No assets attached to this release')
-          else:
-              print(f'Assets ({len(assets)}):')
-              for a in assets:
-                  print(f'  - Name: {a[\"name\"]}')
-                  print(f'    Type: {a[\"content_type\"]}')
-                  print(f'    Size: {a[\"size\"]} bytes')
-                  print(f'    Download URL: {a[\"browser_download_url\"]}')
-          "
+          echo "✅ Release tag checked out"
 
       - name: Get release asset URL
+        id: asset-url
         env:
           PUBLIC_GITHUB_PAT: ${{ secrets.PUBLIC_GITHUB_PAT }}
         run: |
@@ -156,140 +127,120 @@ jobs:
           assets = data.get('assets', [])
           for a in assets:
               if a['name'].endswith('.zip'):
-                  print(a['url'])
-                  sys.exit(0)
+                  print(a['url']); sys.exit(0)
           for a in assets:
-              print(a['url'])
-              sys.exit(0)
+              print(a['url']); sys.exit(0)
           zipball = data.get('zipball_url', '')
           if zipball:
               print('ZIPBALL:' + zipball)
           ")
-
-          echo "Resolved URL: ${ASSET_URL}"
-          echo "asset_url=${ASSET_URL}" >> $GITHUB_ENV
+          echo "asset_url=${ASSET_URL}" >> $GITHUB_OUTPUT
 
       - name: Download release
         env:
           PUBLIC_GITHUB_PAT: ${{ secrets.PUBLIC_GITHUB_PAT }}
+          ASSET_URL: ${{ steps.asset-url.outputs.asset_url }}
         run: |
           mkdir -p ${GITHUB_WORKSPACE}/release-binary
-          ASSET_URL="${{ env.asset_url }}"
-
           if [[ "${ASSET_URL}" == ZIPBALL:* ]]; then
             REAL_URL="${ASSET_URL#ZIPBALL:}"
-            curl -L \
-              -H "Authorization: token ${PUBLIC_GITHUB_PAT}" \
-              -o ${GITHUB_WORKSPACE}/release-binary/release.zip \
-              "${REAL_URL}"
+            curl -L -H "Authorization: token ${PUBLIC_GITHUB_PAT}" \
+              -o ${GITHUB_WORKSPACE}/release-binary/release.zip "${REAL_URL}"
           else
-            curl -L \
-              -H "Authorization: token ${PUBLIC_GITHUB_PAT}" \
+            curl -L -H "Authorization: token ${PUBLIC_GITHUB_PAT}" \
               -H "Accept: application/octet-stream" \
-              -o ${GITHUB_WORKSPACE}/release-binary/release.zip \
-              "${ASSET_URL}"
+              -o ${GITHUB_WORKSPACE}/release-binary/release.zip "${ASSET_URL}"
           fi
-
-          ls -la ${GITHUB_WORKSPACE}/release-binary/release.zip
-          file ${GITHUB_WORKSPACE}/release-binary/release.zip
 
       - name: Extract release
         run: |
           cd ${GITHUB_WORKSPACE}/release-binary
-
-          echo "Extracting..."
           python3 -c "
-          import zipfile, sys
+          import zipfile
           with zipfile.ZipFile('release.zip', 'r') as z:
               z.extractall('.')
-              for name in z.namelist():
-                  print(f'  {name}')
           "
-          echo "✅ Extracted"
 
-          echo "=== Contents ==="
-          find . -type f
-          echo "================"
-
-      - name: Set binary path
+      - name: Set binary metadata
+        id: set-binary
         run: |
           RELEASE_TAG="${{ steps.get-release.outputs.tag }}"
           RELEASE_COMMIT=$(git rev-parse HEAD)
-
-          # Find the binary
           BINARY_PATH=$(find ${GITHUB_WORKSPACE}/release-binary -name "hdbbackint" -type f | head -1)
 
           if [ -z "${BINARY_PATH}" ]; then
             echo "❌ hdbbackint binary not found"
-            echo "All files in release-binary:"
             find ${GITHUB_WORKSPACE}/release-binary -type f
             exit 1
           fi
-
           chmod +x "${BINARY_PATH}"
 
-          echo "prebuilt_binary_path=${BINARY_PATH}" >> $GITHUB_ENV
-          echo "prebuilt_version=${RELEASE_TAG}" >> $GITHUB_ENV
-          echo "prebuilt_commit=${RELEASE_COMMIT}" >> $GITHUB_ENV
+          echo "version=${RELEASE_TAG}" >> $GITHUB_OUTPUT
+          echo "commit=${RELEASE_COMMIT}" >> $GITHUB_OUTPUT
+          echo "✅ Binary ready: ${BINARY_PATH}"
 
-          echo "✅ Binary: ${BINARY_PATH} (${RELEASE_TAG} @ ${RELEASE_COMMIT})"
-      # ---------------------------------------------------------------
-      # STAGE 2: Install dependencies (idempotent)
-      # ---------------------------------------------------------------
+      - name: Upload release binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-binary
+          path: release-binary/
+          retention-days: 2
+
       - name: Install Dependencies
         run: |
-          CHANGED=false
-
           if ! command -v ansible &> /dev/null; then
-            echo "Installing Ansible..."
             sudo apt-get update
             sudo apt-get install -y ansible python3-pip
-            CHANGED=true
-          else
-            echo "✅ Ansible already installed: $(ansible --version | head -1)"
           fi
-
           if ! command -v ibmcloud &> /dev/null; then
-            echo "Installing IBM Cloud CLI..."
             curl -fsSL https://clis.cloud.ibm.com/install/linux | sh
-            CHANGED=true
-          else
-            echo "✅ IBM Cloud CLI already installed: $(ibmcloud --version | head -1)"
           fi
-
           if ! python3 -c "import jmespath" &> /dev/null; then
-            echo "Installing jmespath..."
             pip3 install --user jmespath
-            CHANGED=true
-          else
-            echo "✅ jmespath already installed"
           fi
+          echo "✅ Dependencies ready"
 
-          if [ "$CHANGED" = true ]; then
-            echo "Dependencies were installed"
-          else
-            echo "✅ All dependencies already present — nothing changed"
-          fi
-
-      # ---------------------------------------------------------------
-      # STAGE 3: Clone playbooks
-      # ---------------------------------------------------------------
+  # ==================================================================
+  # JOB 2: Clone Ansible playbooks (Stage 3)
+  # ==================================================================
+  clone-playbooks:
+    name: Clone Ansible Playbooks
+    runs-on: self-hosted
+    needs: prepare
+    timeout-minutes: 10
+    outputs:
+      playbook_commit: ${{ steps.clone.outputs.commit }}
+    steps:
       - name: Clone Ansible Playbooks
+        id: clone
         env:
           GHE_PAT: ${{ secrets.GHE_PAT }}
         run: |
-          echo "Cloning ansible-playbooks-backint repository..."
+          rm -rf ansible-playbooks
           git clone https://${GHE_PAT}@${ANSIBLE_PLAYBOOK_REPO}.git ansible-playbooks
           cd ansible-playbooks
           git checkout ${ANSIBLE_PLAYBOOK_BRANCH}
-
           PLAYBOOK_COMMIT=$(git rev-parse HEAD)
-          echo "playbook_commit=${PLAYBOOK_COMMIT}" >> $GITHUB_ENV
-          echo "✅ Playbook repository cloned (commit: ${PLAYBOOK_COMMIT})"
+          echo "commit=${PLAYBOOK_COMMIT}" >> $GITHUB_OUTPUT
+          echo "✅ Cloned (commit: ${PLAYBOOK_COMMIT})"
 
-      # ---------------------------------------------------------------
-      # STAGE 4: Setup SSH and validate infrastructure
-      # ---------------------------------------------------------------
+      - name: Upload playbooks artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ansible-playbooks
+          path: ansible-playbooks/
+          retention-days: 2
+          include-hidden-files: true
+
+  # ==================================================================
+  # JOB 3: Setup SSH + validate environment (Stage 4)
+  # ==================================================================
+  validate:
+    name: Validate Environment
+    runs-on: self-hosted
+    needs: [prepare, clone-playbooks]
+    timeout-minutes: 15
+    steps:
       - name: Setup SSH Agent
         uses: webfactory/ssh-agent@v0.9.0
         with:
@@ -312,86 +263,131 @@ jobs:
         env:
           IC_API_KEY: ${{ secrets.IC_API_KEY }}
         run: |
-          echo "Validating environment..."
-
-          # Test Power VM connectivity
           ssh -i /tmp/power_vm_key \
-            -o StrictHostKeyChecking=no \
-            -o ConnectTimeout=10 \
+            -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
             root@${POWER_VM_IP} "echo 'Power VM connection successful'"
 
-          # Test SAP HANA status — fail early if HANA is down
           ssh -i /tmp/power_vm_key \
             -o StrictHostKeyChecking=no \
             root@${POWER_VM_IP} \
             "su - ${HANA_SID,,}adm -c 'HDB info'"
 
-          # Login to IBM Cloud
           ibmcloud login --apikey ${IC_API_KEY} -r ${IBM_REGION} -g ${IBM_RESOURCE_GROUP}
-
           echo "✅ Environment validation complete"
 
-      # ---------------------------------------------------------------
-      # STAGE 5: Build and test
-      # ---------------------------------------------------------------
-      - name: Run Prerequisites Playbook (Skip Build, Use Release Binary)
+  # ==================================================================
+  # JOB 4: Run prerequisites + execute tests (Stage 5)
+  # ==================================================================
+  test:
+    name: Build & Test
+    runs-on: self-hosted
+    needs: [prepare, clone-playbooks, validate]
+    timeout-minutes: 90
+    outputs:
+      duration: ${{ steps.execute-tests.outputs.duration }}
+      test_outcome: ${{ steps.execute-tests.outcome }}
+    steps:
+      - name: Download release binary
+        uses: actions/download-artifact@v4
+        with:
+          name: release-binary
+          path: release-binary/
+
+      - name: Download playbooks
+        uses: actions/download-artifact@v4
+        with:
+          name: ansible-playbooks
+          path: ansible-playbooks/
+
+      - name: Resolve binary path
+        id: resolve-binary
+        run: |
+          BINARY_PATH=$(find ${GITHUB_WORKSPACE}/release-binary -name "hdbbackint" -type f | head -1)
+          chmod +x "${BINARY_PATH}"
+          echo "path=${BINARY_PATH}" >> $GITHUB_OUTPUT
+
+      - name: Setup SSH Agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.POWER_VM_SSH_KEY }}
+
+      - name: Add jump hosts to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${POWER_VM_IP} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Setup SSH Key for Power VM
+        env:
+          POWER_VM_SSH_KEY: ${{ secrets.POWER_VM_SSH_KEY }}
+        run: |
+          echo "$POWER_VM_SSH_KEY" > /tmp/power_vm_key
+          chmod 600 /tmp/power_vm_key
+
+      - name: Run Prerequisites Playbook
         env:
           IC_API_KEY: ${{ secrets.IC_API_KEY }}
         run: |
           cd ansible-playbooks
-
-          echo "Running prerequisites playbook (using pre-built binary)..."
           ansible-playbook ansible/playbooks/playbook_prereqs.yml \
             --extra-vars "api_key_value=${IC_API_KEY}" \
             --extra-vars "skip_binary_build=true" \
-            --extra-vars "prebuilt_binary_path=${{ env.prebuilt_binary_path }}" \
-            --extra-vars "prebuilt_version=${{ env.prebuilt_version }}" \
-            --extra-vars "prebuilt_commit=${{ env.prebuilt_commit }}" \
+            --extra-vars "prebuilt_binary_path=${{ steps.resolve-binary.outputs.path }}" \
+            --extra-vars "prebuilt_version=${{ needs.prepare.outputs.prebuilt_version }}" \
+            --extra-vars "prebuilt_commit=${{ needs.prepare.outputs.prebuilt_commit }}" \
             -v
 
-      - name: Run execute-tests Playbook (Executes Tests)
-        if: success()
+      - name: Run execute-tests Playbook
         id: execute-tests
         env:
           HANA_SYSTEM_PASSWORD: ${{ secrets.HANA_SYSTEM_PASSWORD }}
         run: |
           cd ansible-playbooks
-
           START_TIME=$(date +%s)
-
-          echo "Executing comprehensive backint tests..."
           ansible-playbook ansible/playbooks/playbook_execute.yml \
-            -i ansible/inventory/power_vm.yml \
-            -v
-
+            -i ansible/inventory/power_vm.yml -v
           END_TIME=$(date +%s)
           DURATION=$((END_TIME - START_TIME))
-
           echo "duration=${DURATION}" >> $GITHUB_OUTPUT
           echo "✅ Tests completed in ${DURATION} seconds"
 
-      # ---------------------------------------------------------------
-      # STAGE 6: Collect results and clean up
-      # ---------------------------------------------------------------
-      - name: Collect Test Results
+      - name: Upload test artifacts
         if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-artifacts
+          path: ansible-playbooks/artifacts/
+          retention-days: 14
+          if-no-files-found: ignore
+
+  # ==================================================================
+  # JOB 5: Collect results (Stage 6 - first half)
+  # ==================================================================
+  collect:
+    name: Collect Test Results
+    runs-on: self-hosted
+    needs: [prepare, clone-playbooks, test]
+    if: always() && needs.test.result != 'skipped'
+    timeout-minutes: 10
+    steps:
+      - name: Download test artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: test-artifacts
+          path: test-results/
+        continue-on-error: true
+
+      - name: Summarize Run
         run: |
-          echo "Collecting test results..."
           mkdir -p test-results
-
-          if [ -d "ansible-playbooks/artifacts" ]; then
-            cp -r ansible-playbooks/artifacts/* test-results/ || true
-          fi
-
           cat > test-results/system-info.txt << EOF
           Weekly Test Run Information
           ============================
           Run Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-          Release Tag: ${{ steps.get-release.outputs.tag }}
-          Release URL: ${{ steps.get-release.outputs.url }}
-          Playbook Commit: ${playbook_commit}
-          Test Duration: ${{ steps.execute-tests.outputs.duration }} seconds
-          Test Outcome: ${{ steps.execute-tests.outcome }}
+          Release Tag: ${{ needs.prepare.outputs.release_tag }}
+          Release URL: ${{ needs.prepare.outputs.release_url }}
+          Playbook Commit: ${{ needs.clone-playbooks.outputs.playbook_commit }}
+          Test Duration: ${{ needs.test.outputs.duration }} seconds
+          Test Outcome: ${{ needs.test.outputs.test_outcome }}
 
           Environment:
           - Power VM: ${POWER_VM_IP}
@@ -399,31 +395,44 @@ jobs:
           - COS Region: ${IBM_REGION}
           - Resource Group: ${IBM_RESOURCE_GROUP}
           EOF
-
           cat test-results/system-info.txt
 
-      - name: Upload Test Artifacts
-        if: always()
+      - name: Upload final results
         uses: actions/upload-artifact@v4
         with:
-          name: backint-test-results-${{ steps.get-release.outputs.tag }}-${{ github.run_number }}
+          name: weekly-test-results
           path: test-results/
-          retention-days: 14
+          retention-days: 30
 
-      - name: Cleanup
-        if: always()
+  # ==================================================================
+  # JOB 6: Cleanup (Stage 6 - cleanup half)
+  # ==================================================================
+  cleanup:
+    name: Cleanup
+    runs-on: self-hosted
+    needs: [clone-playbooks, test, collect]
+    if: always() && needs.clone-playbooks.result == 'success'
+    timeout-minutes: 15
+    steps:
+      - name: Download playbooks
+        uses: actions/download-artifact@v4
+        with:
+          name: ansible-playbooks
+          path: ansible-playbooks/
+
+      - name: Setup SSH Agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.POWER_VM_SSH_KEY }}
+
+      - name: Run cleanup playbook
         env:
           IC_API_KEY: ${{ secrets.IC_API_KEY }}
         run: |
-          echo "Running cleanup..."
-
-          if [ -d "ansible-playbooks" ]; then
-            cd ansible-playbooks
-            ansible-playbook ansible/playbooks/playbook_cleanup.yml \
-              --extra-vars "api_key_value=${IC_API_KEY}" \
-              -v || echo "⚠️ Cleanup playbook failed, continuing..."
-          fi
-
+          ibmcloud login --apikey ${IC_API_KEY} -r ${IBM_REGION} -g ${IBM_RESOURCE_GROUP} || true
+          cd ansible-playbooks
+          ansible-playbook ansible/playbooks/playbook_cleanup.yml \
+            --extra-vars "api_key_value=${IC_API_KEY}" \
+            -v || echo "⚠️ Cleanup playbook failed, continuing..."
           rm -f /tmp/power_vm_key
-
           echo "✅ Cleanup complete"
