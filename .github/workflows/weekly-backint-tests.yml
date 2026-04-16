@@ -39,7 +39,8 @@ jobs:
     steps:
       - name: Clean workspace before checkout
         run: |
-          echo "Cleaning workspace: ${GITHUB_WORKSPACE}"
+          echo "Fixing ownership and cleaning workspace: ${GITHUB_WORKSPACE}"
+          sudo chown -R $(whoami):$(whoami) "${GITHUB_WORKSPACE}" 2>/dev/null || true
           rm -rf "${GITHUB_WORKSPACE}"/* "${GITHUB_WORKSPACE}"/.[!.]* 2>/dev/null || true
           echo "✅ Workspace cleaned"
 
