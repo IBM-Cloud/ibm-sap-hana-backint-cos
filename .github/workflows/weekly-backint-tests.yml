@@ -217,13 +217,14 @@ jobs:
         env:
           GHE_PAT: ${{ secrets.GHE_PAT }}
         run: |
-          rm -rf ansible-playbooks
+          echo "Cloning ansible-playbooks-backint repository..."
           git clone https://${GHE_PAT}@${ANSIBLE_PLAYBOOK_REPO}.git ansible-playbooks
           cd ansible-playbooks
           git checkout ${ANSIBLE_PLAYBOOK_BRANCH}
+
           PLAYBOOK_COMMIT=$(git rev-parse HEAD)
-          echo "commit=${PLAYBOOK_COMMIT}" >> $GITHUB_OUTPUT
-          echo "✅ Cloned (commit: ${PLAYBOOK_COMMIT})"
+          echo "playbook_commit=${PLAYBOOK_COMMIT}" >> $GITHUB_ENV
+          echo "✅ Playbook repository cloned (commit: ${PLAYBOOK_COMMIT})"
 
       - name: Upload playbooks artifact
         uses: actions/upload-artifact@v4
