@@ -43,12 +43,12 @@ jobs:
           echo "Fixing ownership and cleaning workspace: ${GITHUB_WORKSPACE}"
           sudo chown -R $(whoami):$(whoami) "${GITHUB_WORKSPACE}" 2>/dev/null || true
           rm -rf "${GITHUB_WORKSPACE}"/* "${GITHUB_WORKSPACE}"/.[!.]* 2>/dev/null || true
-          echo "✅ Workspace cleaned"
+          echo "Workspace cleaned"
 
       - name: Create shared directory
         run: |
           mkdir -p "${SHARED_DIR}"
-          echo "✅ Shared dir ready: ${SHARED_DIR}"
+          echo "Shared dir ready: ${SHARED_DIR}"
 
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -115,7 +115,7 @@ jobs:
         run: |
           RELEASE_TAG="${{ steps.get-release.outputs.tag }}"
           git checkout ${RELEASE_TAG}
-          echo "✅ Release tag checked out"
+          echo "Release tag checked out"
 
       - name: Get release asset URL
         id: asset-url
@@ -176,7 +176,7 @@ jobs:
           BINARY_PATH=$(find "${SHARED_DIR}/release-binary" -name "hdbbackint" -type f | head -1)
 
           if [ -z "${BINARY_PATH}" ]; then
-            echo "❌ hdbbackint binary not found"
+            echo " hdbbackint binary not found"
             find "${SHARED_DIR}/release-binary" -type f
             exit 1
           fi
@@ -184,7 +184,7 @@ jobs:
 
           echo "version=${RELEASE_TAG}" >> $GITHUB_OUTPUT
           echo "commit=${RELEASE_COMMIT}" >> $GITHUB_OUTPUT
-          echo "✅ Binary ready: ${BINARY_PATH}"
+          echo " Binary ready: ${BINARY_PATH}"
 
       - name: Install Dependencies
         run: |
@@ -198,7 +198,7 @@ jobs:
           if ! python3 -c "import jmespath" &> /dev/null; then
             pip3 install --user jmespath
           fi
-          echo "✅ Dependencies ready"
+          echo " Dependencies ready"
 
   # ==================================================================
   # JOB 2: Clone Ansible playbooks
@@ -223,7 +223,7 @@ jobs:
           git checkout ${ANSIBLE_PLAYBOOK_BRANCH}
           PLAYBOOK_COMMIT=$(git rev-parse HEAD)
           echo "commit=${PLAYBOOK_COMMIT}" >> $GITHUB_OUTPUT
-          echo "✅ Cloned to ${SHARED_DIR}/ansible-playbooks (commit: ${PLAYBOOK_COMMIT})"
+          echo " Cloned to ${SHARED_DIR}/ansible-playbooks (commit: ${PLAYBOOK_COMMIT})"
 
   # ==================================================================
   # JOB 3: Setup SSH + validate environment
@@ -243,7 +243,7 @@ jobs:
         run: |
           mkdir -p ~/.ssh
           ssh-keyscan -H ${POWER_VM_IP} >> ~/.ssh/known_hosts 2>/dev/null \
-            || echo "⚠️ ssh-keyscan failed for ${POWER_VM_IP}"
+            || echo " ssh-keyscan failed for ${POWER_VM_IP}"
 
       - name: Setup SSH Key for Power VM
         env:
@@ -266,7 +266,7 @@ jobs:
             "su - ${HANA_SID,,}adm -c 'HDB info'"
 
           ibmcloud login --apikey ${IC_API_KEY} -r ${IBM_REGION} -g ${IBM_RESOURCE_GROUP}
-          echo "✅ Environment validation complete"
+          echo " Environment validation complete"
 
   # ==================================================================
   # JOB 4: Run prerequisites + execute tests
@@ -279,19 +279,21 @@ jobs:
     outputs:
       duration: ${{ steps.execute-tests.outputs.duration }}
       test_outcome: ${{ steps.execute-tests.outcome }}
+      tar_file: ${{ steps.capture-tar.outputs.tar_file }}
+      tar_timestamp: ${{ steps.capture-tar.outputs.tar_timestamp }}
     steps:
       - name: Verify shared dir contents
         run: |
           echo "Checking shared directory: ${SHARED_DIR}"
           if [ ! -d "${SHARED_DIR}/ansible-playbooks" ]; then
-            echo "❌ Playbooks dir missing: ${SHARED_DIR}/ansible-playbooks"
+            echo "  Playbooks dir missing: ${SHARED_DIR}/ansible-playbooks"
             exit 1
           fi
           if [ ! -d "${SHARED_DIR}/release-binary" ]; then
-            echo "❌ Release binary dir missing: ${SHARED_DIR}/release-binary"
+            echo " Release binary dir missing: ${SHARED_DIR}/release-binary"
             exit 1
           fi
-          echo "✅ Shared dir has expected contents"
+          echo " Shared dir has expected contents"
 
       - name: Resolve binary path
         id: resolve-binary
@@ -330,6 +332,14 @@ jobs:
             --extra-vars "prebuilt_commit=${{ needs.prepare.outputs.prebuilt_commit }}" \
             -v
 
+      - name: Snapshot existing tar files (pre-test)
+        id: pre-snapshot
+        run: |
+          mkdir -p /tmp/test_results
+          ls /tmp/test_results/e2e-hana-db_results_*.tar 2>/dev/null | sort > /tmp/pre_tar_list.txt || true
+          echo "Pre-test tar files:"
+          cat /tmp/pre_tar_list.txt || echo "(none)"
+
       - name: Run execute-tests Playbook
         id: execute-tests
         env:
@@ -342,15 +352,431 @@ jobs:
           END_TIME=$(date +%s)
           DURATION=$((END_TIME - START_TIME))
           echo "duration=${DURATION}" >> $GITHUB_OUTPUT
-          echo "✅ Tests completed in ${DURATION} seconds"
+          echo " Tests completed in ${DURATION} seconds"
+
+      - name: Capture tar file produced by this run
+        id: capture-tar
+        if: always() && steps.execute-tests.outcome != 'skipped'
+        run: |
+          set -e
+          ls /tmp/test_results/e2e-hana-db_results_*.tar 2>/dev/null | sort > /tmp/post_tar_list.txt || true
+          NEW_TAR=$(comm -13 /tmp/pre_tar_list.txt /tmp/post_tar_list.txt | head -1)
+
+          if [ -z "${NEW_TAR}" ]; then
+            echo "  No new tar file detected — falling back to newest on disk"
+            NEW_TAR=$(ls -t /tmp/test_results/e2e-hana-db_results_*.tar 2>/dev/null | head -1)
+          fi
+
+          if [ -z "${NEW_TAR}" ]; then
+            echo " No tar file found in /tmp/test_results/"
+            ls -la /tmp/test_results/ 2>/dev/null || echo "(directory missing)"
+            exit 1
+          fi
+
+          TIMESTAMP=$(basename "${NEW_TAR}" .tar | sed 's/e2e-hana-db_results_//')
+
+          echo "tar_file=${NEW_TAR}" >> $GITHUB_OUTPUT
+          echo "tar_timestamp=${TIMESTAMP}" >> $GITHUB_OUTPUT
+          echo " Tar file from this run: ${NEW_TAR}"
+          echo " Timestamp: ${TIMESTAMP}"
+
+          rm -f /tmp/pre_tar_list.txt /tmp/post_tar_list.txt
 
   # ==================================================================
-  # JOB 5: Summarize run
+  # JOB 5: Analyze test results & collect HANA info
+  # ==================================================================
+  analyze:
+    name: Analyze Test Results
+    runs-on: self-hosted
+    needs: [prepare, clone-playbooks, test]
+    if: always() && needs.test.result != 'skipped' && needs.test.outputs.tar_file != ''
+    timeout-minutes: 20
+    steps:
+      - name: Setup SSH Agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.POWER_VM_SSH_KEY }}
+
+      - name: Setup SSH key & known_hosts
+        env:
+          POWER_VM_SSH_KEY: ${{ secrets.POWER_VM_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${POWER_VM_IP} >> ~/.ssh/known_hosts 2>/dev/null || true
+          echo "$POWER_VM_SSH_KEY" > /tmp/power_vm_key
+          chmod 600 /tmp/power_vm_key
+
+      - name: Extract tar file produced by this run
+        id: extract
+        env:
+          TAR_FILE: ${{ needs.test.outputs.tar_file }}
+          TIMESTAMP: ${{ needs.test.outputs.tar_timestamp }}
+        run: |
+          set -e
+          if [ ! -f "${TAR_FILE}" ]; then
+            echo " Tar file not found: ${TAR_FILE}"
+            exit 1
+          fi
+
+          EXTRACT_DIR="${SHARED_DIR}/extracted_${TIMESTAMP}"
+          rm -rf "${EXTRACT_DIR}"
+          mkdir -p "${EXTRACT_DIR}"
+          tar -xf "${TAR_FILE}" -C "${EXTRACT_DIR}"
+
+          echo " Extracted: ${TAR_FILE} -> ${EXTRACT_DIR}"
+          echo "=== Contents ==="
+          find "${EXTRACT_DIR}" -maxdepth 2
+
+          echo "extract_dir=${EXTRACT_DIR}" >> $GITHUB_OUTPUT
+
+      - name: Show hdbbackint.cfg & test_results
+        env:
+          EXTRACT_DIR: ${{ steps.extract.outputs.extract_dir }}
+        run: |
+          echo "=== hdbbackint.cfg ==="
+          CFG=$(find "${EXTRACT_DIR}" -name "hdbbackint.cfg" -type f | head -1)
+          if [ -n "${CFG}" ]; then
+            echo "Path: ${CFG}"
+            cat "${CFG}"
+          else
+            echo " hdbbackint.cfg not found"
+          fi
+
+          echo ""
+          echo "=== test_results ==="
+          TR_PATH=$(find "${EXTRACT_DIR}" -iname "test_results" -type f | head -1)
+          if [ -n "${TR_PATH}" ]; then
+            echo "Path: ${TR_PATH}"
+            cat "${TR_PATH}"
+          else
+            echo " test_results file not found"
+          fi
+
+      - name: Gather HANA & Backint info (Python probe on Power VM)
+        id: hana-info
+        env:
+          HANA_SYSTEM_PASSWORD: ${{ secrets.HANA_SYSTEM_PASSWORD }}
+          TIMESTAMP: ${{ needs.test.outputs.tar_timestamp }}
+        run: |
+          INFO_FILE="${SHARED_DIR}/hana_info_${TIMESTAMP}.json"
+
+          REMOTE_SCRIPT=$(mktemp --suffix=.py)
+          cat > "${REMOTE_SCRIPT}" << 'PYEOF'
+          #!/usr/bin/env python3
+          """
+          Runs on the Power VM. Collects HANA + Backint info. Emits JSON to stdout.
+
+          Args:
+              sys.argv[1] -> HANA_SID
+              sys.argv[2] -> HANA_INSTANCE
+              sys.argv[3] -> HANA_PASSWORD
+          """
+          import json
+          import os
+          import subprocess
+          import sys
+          from pathlib import Path
+
+
+          def run(cmd, shell=False, timeout=60, input_text=None):
+              try:
+                  p = subprocess.run(
+                      cmd, shell=shell, capture_output=True, text=True,
+                      timeout=timeout, input=input_text,
+                  )
+                  return {"rc": p.returncode,
+                          "stdout": p.stdout.strip(),
+                          "stderr": p.stderr.strip()}
+              except subprocess.TimeoutExpired:
+                  return {"rc": -1, "stdout": "", "stderr": f"timeout after {timeout}s"}
+              except Exception as e:
+                  return {"rc": -1, "stdout": "", "stderr": f"exception: {e}"}
+
+
+          def find_first(roots, name):
+              for root in roots:
+                  if not Path(root).exists():
+                      continue
+                  r = run(["find", root, "-name", name, "-type", "f"], timeout=30)
+                  for line in r["stdout"].splitlines():
+                      line = line.strip()
+                      if line:
+                          return line
+              return None
+
+
+          def read_file(path, limit=200000):
+              try:
+                  c = Path(path).read_text(errors="replace")
+                  return c if len(c) <= limit else c[:limit] + "\n...[truncated]"
+              except Exception as e:
+                  return f"[error reading {path}: {e}]"
+
+
+          def main():
+              if len(sys.argv) < 4:
+                  print(json.dumps({"error": "usage: probe.py <SID> <INSTANCE> <PASSWORD>"}))
+                  sys.exit(2)
+
+              sid = sys.argv[1]
+              instance = sys.argv[2]
+              password = sys.argv[3]
+              sid_lower = sid.lower()
+
+              result = {}
+              result["hana_version"] = run(
+                  ["su", "-", f"{sid_lower}adm", "-c", "HDB version"], timeout=30)
+              result["hana_db_size"] = {
+                  "data": run(["du", "-sh", f"/hana/data/{sid}"], timeout=30),
+                  "log": run(["du", "-sh", f"/hana/log/{sid}"], timeout=30),
+              }
+
+              backint_paths = []
+              for root in ["/usr/sap", "/hana"]:
+                  if Path(root).exists():
+                      r = run(["find", root, "-name", "hdbbackint", "-type", "f"],
+                              timeout=30)
+                      for line in r["stdout"].splitlines():
+                          line = line.strip()
+                          if line and line not in backint_paths:
+                              backint_paths.append(line)
+              result["backint_binary_paths"] = backint_paths
+              backint_bin = backint_paths[0] if backint_paths else None
+
+              if backint_bin:
+                  result["backint_version"] = run([backint_bin, "--version"], timeout=15)
+              else:
+                  result["backint_version"] = {"rc": -1, "stdout": "",
+                                               "stderr": "backint binary not found"}
+
+              cfg_path = find_first(["/usr/sap"], "hdbbackint.cfg")
+              if cfg_path:
+                  result["backint_config"] = {"path": cfg_path,
+                                              "content": read_file(cfg_path)}
+              else:
+                  result["backint_config"] = {"path": None, "content": None,
+                                              "error": "hdbbackint.cfg not found"}
+
+              if backint_bin:
+                  h = run([backint_bin, "--help"], timeout=15)
+                  if h["stdout"]:
+                      h["stdout"] = "\n".join(h["stdout"].splitlines()[:50])
+                  result["cli_help"] = h
+              else:
+                  result["cli_help"] = {"rc": -1, "stdout": "",
+                                        "stderr": "backint binary not found"}
+
+              sql = (
+                  "SELECT TOP 10 BACKUP_ID, ENTRY_TYPE_NAME, STATE_NAME, "
+                  "UTC_START_TIME, UTC_END_TIME, "
+                  "SECONDS_BETWEEN(UTC_START_TIME, UTC_END_TIME) AS DURATION_SEC, "
+                  "BACKUP_SIZE FROM SYS.M_BACKUP_CATALOG "
+                  "ORDER BY UTC_START_TIME DESC"
+              )
+              env = os.environ.copy()
+              env["HANA_PW"] = password
+              cat = subprocess.run(
+                  ["su", "-", f"{sid_lower}adm", "-c",
+                   f'hdbsql -i {instance} -d SYSTEMDB -u SYSTEM -p "$HANA_PW" -x -a -j "{sql}"'],
+                  capture_output=True, text=True, timeout=60, env=env,
+              )
+              catalog_rows = []
+              if cat.returncode == 0 and cat.stdout:
+                  for line in cat.stdout.strip().splitlines():
+                      parts = [p.strip().strip('"') for p in line.split(",")]
+                      if len(parts) >= 7:
+                          catalog_rows.append({
+                              "backup_id": parts[0],
+                              "entry_type": parts[1],
+                              "state": parts[2],
+                              "utc_start_time": parts[3],
+                              "utc_end_time": parts[4],
+                              "duration_sec": parts[5],
+                              "backup_size_bytes": parts[6],
+                          })
+              result["backup_catalog"] = {
+                  "rc": cat.returncode,
+                  "rows": catalog_rows,
+                  "raw_stderr": cat.stderr.strip(),
+              }
+
+              print(json.dumps(result, indent=2, default=str))
+
+
+          if __name__ == "__main__":
+              main()
+          PYEOF
+
+          scp -i /tmp/power_vm_key -o StrictHostKeyChecking=no \
+            "${REMOTE_SCRIPT}" root@${POWER_VM_IP}:/tmp/hana_probe.py
+
+          ssh -i /tmp/power_vm_key -o StrictHostKeyChecking=no \
+            root@${POWER_VM_IP} \
+            "chmod +x /tmp/hana_probe.py && /tmp/hana_probe.py '${HANA_SID}' '${HANA_INSTANCE}' '${HANA_SYSTEM_PASSWORD}'; rm -f /tmp/hana_probe.py" \
+            > "${INFO_FILE}" 2>&1
+
+          rm -f "${REMOTE_SCRIPT}"
+
+          echo " HANA info captured from ${POWER_VM_IP}:"
+          cat "${INFO_FILE}"
+          echo "info_file=${INFO_FILE}" >> $GITHUB_OUTPUT
+
+      - name: Build and print JSON report
+        id: build-json
+        env:
+          EXTRACT_DIR: ${{ steps.extract.outputs.extract_dir }}
+          TAR_FILE: ${{ needs.test.outputs.tar_file }}
+          TIMESTAMP: ${{ needs.test.outputs.tar_timestamp }}
+          INFO_FILE: ${{ steps.hana-info.outputs.info_file }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
+          PREBUILT_VERSION: ${{ needs.prepare.outputs.prebuilt_version }}
+          PREBUILT_COMMIT: ${{ needs.prepare.outputs.prebuilt_commit }}
+          PLAYBOOK_COMMIT: ${{ needs.clone-playbooks.outputs.playbook_commit }}
+          TEST_DURATION: ${{ needs.test.outputs.duration }}
+          TEST_OUTCOME: ${{ needs.test.outputs.test_outcome }}
+        run: |
+          python3 << 'PYEOF'
+          import json
+          import os
+          import re
+          from pathlib import Path
+
+          extract_dir = Path(os.environ["EXTRACT_DIR"])
+          info_file = Path(os.environ["INFO_FILE"])
+
+          def read_file(p, limit=200000):
+              try:
+                  c = p.read_text(errors='replace')
+                  return c if len(c) <= limit else c[:limit] + "\n...[truncated]"
+              except Exception as e:
+                  return f"[error reading {p}: {e}]"
+
+          # hdbbackint.cfg
+          cfg_data = {"path": None, "content": None}
+          for f in extract_dir.rglob("hdbbackint.cfg"):
+              if f.is_file():
+                  cfg_data = {"path": str(f), "content": read_file(f)}
+                  break
+
+          # test_results file
+          tr_data = {"path": None, "raw_content": None, "tests": [], "summary": {}}
+          tr_path = None
+          for p in list(extract_dir.rglob("test_results")) + list(extract_dir.rglob("testresults*")):
+              if p.is_file():
+                  tr_path = p
+                  break
+
+          backup_duration = None
+          restore_duration = None
+
+          if tr_path:
+              tr_data["path"] = str(tr_path)
+              raw = read_file(tr_path)
+              tr_data["raw_content"] = raw
+
+              line_re = re.compile(
+                  r'^(?P<status>PASSED|FAILED|SKIPPED)\s+'
+                  r'(?P<desc>.+?)'
+                  r'(?:[.,]\s*Return Code:\s*(?P<rc>-?\d+))?\s*$'
+              )
+              dur_re = re.compile(r'Duration in seconds:\s*(?P<dur>\d+(?:\.\d+)?)', re.IGNORECASE)
+
+              passed = failed = skipped = 0
+              for line in raw.splitlines():
+                  line = line.strip()
+                  if not line:
+                      continue
+                  m = line_re.match(line)
+                  if not m:
+                      continue
+                  status = m.group("status")
+                  desc = m.group("desc").strip().rstrip(' .,')
+                  rc = int(m.group("rc")) if m.group("rc") is not None else None
+                  entry = {"status": status, "description": desc, "return_code": rc}
+
+                  dm = dur_re.search(desc)
+                  if dm:
+                      dur = float(dm.group("dur"))
+                      entry["duration_seconds"] = dur
+                      d_low = desc.lower()
+                      if "backup" in d_low and "hana" in d_low:
+                          backup_duration = dur
+                      elif ("recover" in d_low or "restore" in d_low) and "hana" in d_low:
+                          restore_duration = dur
+
+                  tr_data["tests"].append(entry)
+                  if status == "PASSED":
+                      passed += 1
+                  elif status == "FAILED":
+                      failed += 1
+                  elif status == "SKIPPED":
+                      skipped += 1
+
+              total = passed + failed + skipped
+              tr_data["summary"] = {
+                  "total": total,
+                  "passed": passed,
+                  "failed": failed,
+                  "skipped": skipped,
+                  "pass_rate_pct": round(passed / total * 100, 2) if total else 0.0,
+                  "overall_status": "PASSED" if failed == 0 and total > 0 else "FAILED",
+              }
+
+          performance = {
+              "backup_hana_db_seconds": backup_duration,
+              "restore_hana_db_seconds": restore_duration,
+              "note": "Durations parsed from test_results file",
+          }
+
+          # HANA info (probe emits JSON)
+          hana = {}
+          if info_file.exists():
+              try:
+                  hana = json.loads(info_file.read_text())
+              except json.JSONDecodeError as e:
+                  hana = {"_parse_error": str(e),
+                          "_raw": info_file.read_text()[:5000]}
+
+          tar_files = [str(p.relative_to(extract_dir))
+                       for p in extract_dir.rglob('*') if p.is_file()]
+
+          report = {
+              "run_metadata": {
+                  "run_id": os.environ.get("GITHUB_RUN_ID"),
+                  "timestamp": os.environ["TIMESTAMP"],
+                  "release_tag": os.environ["RELEASE_TAG"],
+                  "prebuilt_version": os.environ["PREBUILT_VERSION"],
+                  "prebuilt_commit": os.environ["PREBUILT_COMMIT"],
+                  "playbook_commit": os.environ["PLAYBOOK_COMMIT"],
+                  "test_duration_seconds": os.environ["TEST_DURATION"],
+                  "test_outcome": os.environ["TEST_OUTCOME"],
+              },
+              "tar_file": {
+                  "path": os.environ["TAR_FILE"],
+                  "inventory": tar_files,
+              },
+              "hdbbackint_cfg": cfg_data,
+              "test_results": tr_data,
+              "performance": performance,
+              "hana_info": hana,
+          }
+
+          print("=============== JSON REPORT ===============")
+          print(json.dumps(report, indent=2, default=str))
+          print("=============== END JSON REPORT ===============")
+          PYEOF
+
+      - name: Cleanup SSH key
+        if: always()
+        run: rm -f /tmp/power_vm_key
+
+  # ==================================================================
+  # JOB 6: Summarize run
   # ==================================================================
   summarize:
     name: Summarize Run
     runs-on: self-hosted
-    needs: [prepare, clone-playbooks, test]
+    needs: [prepare, clone-playbooks, test, analyze]
     if: always() && needs.test.result != 'skipped'
     timeout-minutes: 5
     steps:
@@ -365,6 +791,7 @@ jobs:
           echo "Playbook Commit: ${{ needs.clone-playbooks.outputs.playbook_commit }}"
           echo "Test Duration:   ${{ needs.test.outputs.duration }} seconds"
           echo "Test Outcome:    ${{ needs.test.outputs.test_outcome }}"
+          echo "Tar File:        ${{ needs.test.outputs.tar_file }}"
           echo ""
           echo "Environment:"
           echo "  Power VM:       ${POWER_VM_IP}"
@@ -373,12 +800,12 @@ jobs:
           echo "  Resource Group: ${IBM_RESOURCE_GROUP}"
 
   # ==================================================================
-  # JOB 6: Cleanup
+  # JOB 7: Cleanup
   # ==================================================================
   cleanup:
     name: Cleanup
     runs-on: self-hosted
-    needs: [clone-playbooks, test, summarize]
+    needs: [clone-playbooks, test, analyze, summarize]
     if: always() && needs.clone-playbooks.result == 'success'
     timeout-minutes: 15
     steps:
@@ -416,3 +843,25 @@ jobs:
           find /var/tmp/backint-ci -maxdepth 1 -mindepth 1 -type d -mtime +7 \
             -exec sudo rm -rf {} + 2>/dev/null || true
           echo "✅ Old shared dirs pruned"
+
+      - name: Cleanup /tmp/test_results
+        if: always()
+        run: |
+          # Remove all extracted directories
+          find /tmp/test_results -maxdepth 1 -mindepth 1 -type d \
+            -exec rm -rf {} + 2>/dev/null || true
+          echo "✅ Extracted directories removed"
+
+          # Remove all non-tar files (json, txt, etc.)
+          find /tmp/test_results -maxdepth 1 -type f ! -name "*.tar" \
+            -delete 2>/dev/null || true
+          echo "✅ Non-tar files removed"
+
+          # Keep only tar files from the last 2 weeks, delete older ones
+          find /tmp/test_results -maxdepth 1 -type f -name "*.tar" -mtime +14 \
+            -delete 2>/dev/null || true
+          echo "✅ Tar files older than 14 days removed"
+
+          # Show what remains
+          echo "=== Remaining in /tmp/test_results ==="
+          ls -lah /tmp/test_results/ 2>/dev/null || echo "(empty)"
