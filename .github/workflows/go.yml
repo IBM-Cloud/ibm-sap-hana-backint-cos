@@ -5,9 +5,9 @@ permissions:
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
   pull_request:
-    branches: [main]
+    branches: [ main ]
 
 env:
   GO_VERSION: "^1.24"
@@ -65,5 +65,5 @@ jobs:
 
       - name: Run tests
         env:
-          APIKEY: ${{ secrets.APIKEY }}
+          APIKEY: "xxxxxxxxxxxxxxxxxxxx"
         run: go test -v -race -coverprofile=coverage.out ./tests/...
