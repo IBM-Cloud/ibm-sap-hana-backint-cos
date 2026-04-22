@@ -8,6 +8,22 @@ on:
         description: "Specific release tag to test (leave empty for latest)"
         required: false
         type: string
+      skip_playbooks:
+        description: "Skip Ansible playbook jobs (use existing tar file for
+          analyze/upload/summarize only)"
+        required: false
+        type: boolean
+        default: false
+      tar_file_path:
+        description: "Path to existing tar file (required when skip_playbooks is true)"
+        required: false
+        type: string
+        default: ""
+      test_duration:
+        description: "Test duration in seconds (required when skip_playbooks is true)"
+        required: false
+        type: string
+        default: "0"
 
 concurrency:
   group: backint-weekly-tests
@@ -30,6 +46,7 @@ jobs:
   prepare:
     name: Prepare & Install Dependencies
     runs-on: self-hosted
+    if: ${{ github.event.inputs.skip_playbooks != 'true' }}
     timeout-minutes: 30
     outputs:
       release_tag: ${{ steps.get-release.outputs.tag }}
@@ -207,6 +224,7 @@ jobs:
     name: Clone Ansible Playbooks
     runs-on: self-hosted
     needs: prepare
+    if: ${{ github.event.inputs.skip_playbooks != 'true' }}
     timeout-minutes: 10
     outputs:
       playbook_commit: ${{ steps.clone.outputs.commit }}
@@ -232,6 +250,7 @@ jobs:
     name: Validate Environment
     runs-on: self-hosted
     needs: [ prepare, clone-playbooks ]
+    if: ${{ github.event.inputs.skip_playbooks != 'true' }}
     timeout-minutes: 15
     steps:
       - name: Setup SSH Agent
@@ -275,6 +294,7 @@ jobs:
     name: Build & Test
     runs-on: self-hosted
     needs: [ prepare, clone-playbooks, validate ]
+    if: ${{ github.event.inputs.skip_playbooks != 'true' }}
     timeout-minutes: 90
     outputs:
       duration: ${{ steps.execute-tests.outputs.duration }}
@@ -383,14 +403,101 @@ jobs:
           rm -f /tmp/pre_tar_list.txt /tmp/post_tar_list.txt
 
   # ==================================================================
-  # JOB 5: Analyze test results & throughput
+  # JOB 5: Resolve inputs for downstream jobs
+  #   - Full run:  uses outputs from prepare / test
+  #   - Skip mode: uses workflow_dispatch inputs + discovers tar on disk
+  # ==================================================================
+  resolve-inputs:
+    name: Resolve Inputs
+    runs-on: self-hosted
+    needs: [ prepare, test ]
+    if: always()
+    timeout-minutes: 5
+    outputs:
+      tar_file: ${{ steps.resolve.outputs.tar_file }}
+      tar_timestamp: ${{ steps.resolve.outputs.tar_timestamp }}
+      duration: ${{ steps.resolve.outputs.duration }}
+      release_tag: ${{ steps.resolve.outputs.release_tag }}
+      test_outcome: ${{ steps.resolve.outputs.test_outcome }}
+      mode: ${{ steps.resolve.outputs.mode }}
+    steps:
+      - name: Resolve tar file, duration, and release tag
+        id: resolve
+        env:
+          SKIP: ${{ github.event.inputs.skip_playbooks }}
+          INPUT_TAR: ${{ github.event.inputs.tar_file_path }}
+          INPUT_DURATION: ${{ github.event.inputs.test_duration }}
+          INPUT_TAG: ${{ github.event.inputs.release_tag }}
+          TEST_TAR: ${{ needs.test.outputs.tar_file }}
+          TEST_TIMESTAMP: ${{ needs.test.outputs.tar_timestamp }}
+          TEST_DURATION: ${{ needs.test.outputs.duration }}
+          TEST_OUTCOME: ${{ needs.test.outputs.test_outcome }}
+          PREPARE_TAG: ${{ needs.prepare.outputs.release_tag }}
+        run: |
+          set -e
+
+          if [ "${SKIP}" = "true" ]; then
+            echo "mode=skip" >> $GITHUB_OUTPUT
+            echo "=== SKIP PLAYBOOKS MODE ==="
+
+            # --- Resolve tar file ---
+            if [ -n "${INPUT_TAR}" ] && [ -f "${INPUT_TAR}" ]; then
+              TAR_FILE="${INPUT_TAR}"
+              echo "Using provided tar: ${TAR_FILE}"
+            else
+              echo "Input tar not found or not provided, discovering latest on disk..."
+              TAR_FILE=$(ls -t /tmp/test_results/e2e-hana-db_results_*.tar 2>/dev/null | head -1)
+              if [ -z "${TAR_FILE}" ]; then
+                echo "ERROR: No tar file found in /tmp/test_results/"
+                ls -la /tmp/test_results/ 2>/dev/null || echo "(directory missing)"
+                exit 1
+              fi
+              echo "Discovered latest tar: ${TAR_FILE}"
+            fi
+
+            TIMESTAMP=$(basename "${TAR_FILE}" .tar | sed 's/e2e-hana-db_results_//')
+            DURATION="${INPUT_DURATION:-0}"
+            RELEASE_TAG="${INPUT_TAG:-skip-mode}"
+            TEST_OUTCOME_VAL="skipped-playbooks"
+
+          else
+            echo "mode=full" >> $GITHUB_OUTPUT
+            echo "=== FULL PIPELINE MODE ==="
+
+            TAR_FILE="${TEST_TAR}"
+            TIMESTAMP="${TEST_TIMESTAMP}"
+            DURATION="${TEST_DURATION}"
+            RELEASE_TAG="${PREPARE_TAG}"
+            TEST_OUTCOME_VAL="${TEST_OUTCOME}"
+
+            if [ -z "${TAR_FILE}" ]; then
+              echo "ERROR: No tar file produced by test job"
+              exit 1
+            fi
+          fi
+
+          echo "tar_file=${TAR_FILE}" >> $GITHUB_OUTPUT
+          echo "tar_timestamp=${TIMESTAMP}" >> $GITHUB_OUTPUT
+          echo "duration=${DURATION}" >> $GITHUB_OUTPUT
+          echo "release_tag=${RELEASE_TAG}" >> $GITHUB_OUTPUT
+          echo "test_outcome=${TEST_OUTCOME_VAL}" >> $GITHUB_OUTPUT
+
+          echo ""
+          echo "=== Resolved Inputs ==="
+          echo "  Tar file:    ${TAR_FILE}"
+          echo "  Timestamp:   ${TIMESTAMP}"
+          echo "  Duration:    ${DURATION}s"
+          echo "  Release tag: ${RELEASE_TAG}"
+          echo "  Outcome:     ${TEST_OUTCOME_VAL}"
+
+  # ==================================================================
+  # JOB 6: Analyze test results & throughput
   # ==================================================================
   analyze:
     name: Analyze Test Results
     runs-on: self-hosted
-    needs: [ prepare, clone-playbooks, test ]
-    if: always() && needs.test.result != 'skipped' && needs.test.outputs.tar_file !=
-      ''
+    needs: [ resolve-inputs ]
+    if: always() && needs.resolve-inputs.result == 'success'
     timeout-minutes: 20
     steps:
       - name: Setup SSH Agent
@@ -407,11 +514,50 @@ jobs:
           echo "$POWER_VM_SSH_KEY" > /tmp/power_vm_key
           chmod 600 /tmp/power_vm_key
 
-      - name: Extract tar file produced by this run
+      - name: Collect OS details from Power VM
+        id: os-details
+        run: |
+          echo "============================================"
+          echo "  Power VM OS Details (${POWER_VM_IP})"
+          echo "============================================"
+
+          ssh -i /tmp/power_vm_key -o StrictHostKeyChecking=no root@${POWER_VM_IP} << 'REMOTE_EOF'
+          echo "--- OS Release ---"
+          cat /etc/os-release 2>/dev/null || cat /etc/redhat-release 2>/dev/null || echo "Unknown OS"
+
+          echo ""
+          echo "--- Kernel ---"
+          uname -a
+
+          echo ""
+          echo "--- Architecture ---"
+          uname -m
+
+          echo ""
+          echo "--- CPU Info ---"
+          lscpu 2>/dev/null | grep -E "^(Architecture|CPU\(s\)|Model name|Thread|Core|Socket)" || \
+            grep -c ^processor /proc/cpuinfo | xargs -I{} echo "CPU(s): {}"
+
+          echo ""
+          echo "--- Memory ---"
+          free -h
+
+          echo ""
+          echo "--- Disk Usage (/hana) ---"
+          df -h /hana/data /hana/log 2>/dev/null || df -h /
+
+          echo ""
+          echo "--- Hostname ---"
+          hostname -f 2>/dev/null || hostname
+          REMOTE_EOF
+
+          echo "============================================"
+
+      - name: Extract tar file
         id: extract
         env:
-          TAR_FILE: ${{ needs.test.outputs.tar_file }}
-          TIMESTAMP: ${{ needs.test.outputs.tar_timestamp }}
+          TAR_FILE: ${{ needs.resolve-inputs.outputs.tar_file }}
+          TIMESTAMP: ${{ needs.resolve-inputs.outputs.tar_timestamp }}
         run: |
           set -e
           if [ ! -f "${TAR_FILE}" ]; then
@@ -423,6 +569,10 @@ jobs:
           rm -rf "${EXTRACT_DIR}"
           mkdir -p "${EXTRACT_DIR}"
           tar -xf "${TAR_FILE}" -C "${EXTRACT_DIR}"
+
+          # Fix ownership & permissions — tar preserves root/sidadm from Power VM
+          sudo chown -R $(whoami):$(whoami) "${EXTRACT_DIR}"
+          chmod -R u+rwX,go+rX "${EXTRACT_DIR}"
 
           echo " Extracted: ${TAR_FILE} -> ${EXTRACT_DIR}"
           echo "=== Contents ==="
@@ -456,7 +606,7 @@ jobs:
       - name: Analyze throughput based on HANA DB size
         id: throughput
         env:
-          DURATION: ${{ needs.test.outputs.duration }}
+          DURATION: ${{ needs.resolve-inputs.outputs.duration }}
         run: |
           set -e
 
@@ -522,21 +672,20 @@ jobs:
         run: rm -f /tmp/power_vm_key
 
   # ==================================================================
-  # JOB 6: Upload test results to GitHub Artifacts
+  # JOB 7: Upload test results to GitHub Artifacts
   # ==================================================================
   upload-artifacts:
     name: Upload Test Results
     runs-on: self-hosted
-    needs: [ prepare, test ]
-    if: always() && needs.test.result != 'skipped' && needs.test.outputs.tar_file !=
-      ''
+    needs: [ resolve-inputs ]
+    if: always() && needs.resolve-inputs.result == 'success'
     timeout-minutes: 10
     steps:
       - name: Prepare artifact metadata
         id: meta
         env:
-          RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
-          TIMESTAMP: ${{ needs.test.outputs.tar_timestamp }}
+          RELEASE_TAG: ${{ needs.resolve-inputs.outputs.release_tag }}
+          TIMESTAMP: ${{ needs.resolve-inputs.outputs.tar_timestamp }}
         run: |
           ARTIFACT_NAME="backint-test-results_${RELEASE_TAG}_${TIMESTAMP}"
           # GitHub artifact names cannot contain: " : < > | * ? \r \n / \
@@ -544,36 +693,66 @@ jobs:
           echo "artifact_name=${ARTIFACT_NAME}" >> $GITHUB_OUTPUT
           echo "Artifact name: ${ARTIFACT_NAME}"
 
+      - name: Repack tar with fixed permissions
+        id: repack
+        env:
+          TAR_FILE: ${{ needs.resolve-inputs.outputs.tar_file }}
+          TIMESTAMP: ${{ needs.resolve-inputs.outputs.tar_timestamp }}
+        run: |
+          set -e
+          WORK_DIR="/tmp/repack_${TIMESTAMP}_$$"
+          mkdir -p "${WORK_DIR}"
+
+          # Extract original tar
+          tar -xf "${TAR_FILE}" -C "${WORK_DIR}"
+
+          # Fix ownership and permissions so downloaded artifact is viewable
+          sudo chown -R $(whoami):$(whoami) "${WORK_DIR}"
+          chmod -R u+rwX,go+rX "${WORK_DIR}"
+
+          # Repack with corrected permissions
+          FIXED_TAR="/tmp/test_results/fixed_$(basename ${TAR_FILE})"
+          tar -cf "${FIXED_TAR}" -C "${WORK_DIR}" .
+
+          rm -rf "${WORK_DIR}"
+          echo "upload_tar=${FIXED_TAR}" >> $GITHUB_OUTPUT
+          echo "Repacked with fixed permissions: ${FIXED_TAR}"
+
       - name: Upload tar file as GitHub Artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.meta.outputs.artifact_name }}
-          path: ${{ needs.test.outputs.tar_file }}
-          retention-days: 15
+          path: ${{ steps.repack.outputs.upload_tar }}
+          retention-days: 30
           if-no-files-found: error
 
   # ==================================================================
-  # JOB 7: Summarize run
+  # JOB 8: Summarize run
   # ==================================================================
   summarize:
     name: Summarize Run
     runs-on: self-hosted
-    needs: [ prepare, clone-playbooks, test, analyze, upload-artifacts ]
-    if: always() && needs.test.result != 'skipped'
+    needs: [ resolve-inputs, analyze, upload-artifacts ]
+    if: always() && needs.resolve-inputs.result == 'success'
     timeout-minutes: 5
     steps:
       - name: Print run summary
+        env:
+          MODE: ${{ needs.resolve-inputs.outputs.mode }}
+          RELEASE_TAG: ${{ needs.resolve-inputs.outputs.release_tag }}
+          DURATION: ${{ needs.resolve-inputs.outputs.duration }}
+          TEST_OUTCOME: ${{ needs.resolve-inputs.outputs.test_outcome }}
+          TAR_FILE: ${{ needs.resolve-inputs.outputs.tar_file }}
         run: |
           echo "============================"
           echo "Weekly Test Run Information"
           echo "============================"
           echo "Run Date:        $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
-          echo "Release Tag:     ${{ needs.prepare.outputs.release_tag }}"
-          echo "Release URL:     ${{ needs.prepare.outputs.release_url }}"
-          echo "Playbook Commit: ${{ needs.clone-playbooks.outputs.playbook_commit }}"
-          echo "Test Duration:   ${{ needs.test.outputs.duration }} seconds"
-          echo "Test Outcome:    ${{ needs.test.outputs.test_outcome }}"
-          echo "Tar File:        ${{ needs.test.outputs.tar_file }}"
+          echo "Run Mode:        ${MODE}"
+          echo "Release Tag:     ${RELEASE_TAG}"
+          echo "Test Duration:   ${DURATION} seconds"
+          echo "Test Outcome:    ${TEST_OUTCOME}"
+          echo "Tar File:        ${TAR_FILE}"
           echo ""
           echo "Environment:"
           echo "  Power VM:       ${POWER_VM_IP}"
@@ -582,21 +761,23 @@ jobs:
           echo "  Resource Group: ${IBM_RESOURCE_GROUP}"
 
   # ==================================================================
-  # JOB 8: Cleanup
+  # JOB 9: Cleanup
   # ==================================================================
   cleanup:
     name: Cleanup
     runs-on: self-hosted
-    needs: [ clone-playbooks, test, analyze, upload-artifacts, summarize ]
-    if: always() && needs.clone-playbooks.result == 'success'
+    needs: [ clone-playbooks, resolve-inputs, analyze, upload-artifacts, summarize ]
+    if: always()
     timeout-minutes: 15
     steps:
       - name: Setup SSH Agent
+        if: ${{ needs.clone-playbooks.result == 'success' }}
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.POWER_VM_SSH_KEY }}
 
       - name: Run cleanup playbook
+        if: ${{ needs.clone-playbooks.result == 'success' }}
         env:
           IC_API_KEY: ${{ secrets.IC_API_KEY }}
         run: |
@@ -615,8 +796,7 @@ jobs:
       - name: Remove shared directory
         if: always()
         run: |
-          sudo chown -R $(whoami):$(whoami) "${SHARED_DIR}" 2>/dev/null || true
-          rm -rf "${SHARED_DIR}"
+          sudo rm -rf "${SHARED_DIR}" 2>/dev/null || true
           echo "Shared dir removed: ${SHARED_DIR}"
 
       - name: Prune old shared dirs (older than 7 days)
@@ -629,15 +809,17 @@ jobs:
       - name: Cleanup /tmp/test_results
         if: always()
         run: |
-          # Remove all extracted directories
-          find /tmp/test_results -maxdepth 1 -mindepth 1 -type d \
+          # Remove all extracted directories (may have root-owned files from tar)
+          sudo find /tmp/test_results -maxdepth 1 -mindepth 1 -type d \
             -exec rm -rf {} + 2>/dev/null || true
           echo "Extracted directories removed"
 
-          # Remove all non-tar files (json, txt, etc.)
+          # Remove repacked and non-tar files
+          find /tmp/test_results -maxdepth 1 -type f -name "fixed_*.tar" \
+            -delete 2>/dev/null || true
           find /tmp/test_results -maxdepth 1 -type f ! -name "*.tar" \
             -delete 2>/dev/null || true
-          echo "Non-tar files removed"
+          echo "Non-tar and repacked files removed"
 
           # Keep only tar files from the last 2 weeks, delete older ones
           find /tmp/test_results -maxdepth 1 -type f -name "*.tar" -mtime +14 \
