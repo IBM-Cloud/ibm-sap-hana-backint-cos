@@ -164,7 +164,7 @@ func setupConfigTests(t *testing.T) []ConfigTest {
 		name:          "Missing object lock retention period",
 		cfgPath:       prepareConfigFile(t, tempDir, apiKeyFile, cfgObjMissingPeriodFile),
 		shouldSucceed: false,
-		msgToCheck: "ERROR: You specified 'object_lock_retention_mode = cmp'," +
+		msgToCheck: "ERROR: You specified 'cmp' or 'gov' for 'object_lock_retention_mode'," +
 			" but no 'object_lock_retention_period' is specified.",
 	})
 

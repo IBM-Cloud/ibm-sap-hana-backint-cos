@@ -60,6 +60,8 @@ var region = Default{
 		"eu-de",
 		"eu-es",
 		"eu-gb",
+		"in-che",
+		"in-mum",
 		"jp-osa",
 		"jp-tok",
 		"us-east",
@@ -73,7 +75,7 @@ backint Section
 var max_concurrency = Default{
 	key:            "max_concurrency",
 	section:        SECTION_BACKINT,
-	defaultValue:   "10",
+	defaultValue:   "4",
 	min:            1,
 	max:            20,
 	mandatory:      false,
@@ -82,7 +84,7 @@ var max_concurrency = Default{
 var recover_max_concurrency = Default{
 	key:            "recover_max_concurrency",
 	section:        SECTION_BACKINT,
-	defaultValue:   "0",
+	defaultValue:   "4",
 	mandatory:      false,
 	validationType: CONFIG_INT}
 
@@ -130,8 +132,8 @@ var object_lock_legal_hold_status = Default{
 var object_lock_retention_mode = Default{
 	key:            "object_lock_retention_mode",
 	section:        SECTION_OBJECTS,
-	defaultValue:   "None",
-	possibleValues: []string{"None", "cmp"},
+	defaultValue:   "none",
+	possibleValues: []string{"none", "cmp", "gov"},
 	mandatory:      false,
 	validationType: CONFIG_LIST}
 

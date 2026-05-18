@@ -1,239 +1,560 @@
-# [3644731](https://me.sap.com/notes/3644731) - Install and Configure IBM Backint agent for SAP HANA with IBM Cloud Object Storage
+# IBM Backint Agent for SAP HANA with IBM Cloud Object Storage
 
-# Symptom
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Latest Release](https://img.shields.io/github/v/release/IBM-Cloud/ibm-sap-hana-backint-cos)](https://github.com/IBM-Cloud/ibm-sap-hana-backint-cos/releases)
 
-This SAP Note applies only to the IBM Backint agent for SAP HANA with IBM Cloud Object Storage and SAP workloads running on IBM Power Servers.
+A high-performance Backint agent for SAP HANA that enables backup and recovery operations using IBM Cloud Object Storage. This agent is specifically designed and optimized for SAP workloads running on IBM Power Servers.
 
-You can use IBM Backint agent for SAP HANA to backup and recover SAP HANA using Cloud Object Storage offered by IBM.
+## Table of Contents
 
-IBM Backint agent for SAP HANA with IBM Cloud Object Storage **supports regional endpoints only**.
+- [Overview](#overview)
+- [Key Features](#key-features)
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Configuration](#configuration)
+  - [Configuration File Structure](#configuration-file-structure)
+  - [Configuration Parameters](#configuration-parameters)
+  - [Key Prefixes](#key-prefixes)
+  - [Complete Configuration Example](#complete-configuration-example)
+  - [Validate Configuration](#validate-configuration)
+- [SAP HANA Configuration](#sap-hana-configuration)
+  - [Recommended Parameters](#recommended-parameters)
+  - [Parameter Combinations](#parameter-combinations)
+- [Architecture](#architecture)
+- [Troubleshooting](#troubleshooting)
+- [Performance Tuning](#performance-tuning)
+- [Examples](#examples)
+- [Contributing](#contributing)
+- [License](#license)
+- [Support](#support)
 
-This SAP Note describes how to install and configure the IBM Backint for SAP HANA with IBM Cloud Object Storage.
+## Overview
 
-# Other Terms
+The IBM Backint agent for SAP HANA provides a certified interface between SAP HANA databases and IBM Cloud Object Storage (COS). It implements the SAP Backint API to enable:
 
-SAP HANA, Backint, IBM, Cloud Object Storage, Backup and Recovery, Power Virtual Server
+- **Data backups**: Full and incremental database backups.
+- **Log backups**: Continuous transaction log backups.
+- **Catalog backups**: Backup catalog management.
+- **Recovery operations**: Point-in-time and full database recovery.
 
-# Prerequisites
+This implementation supports **regional endpoints only** and requires object versioning and object lock to be enabled on the IBM Cloud Object Storage bucket.
 
-1. **IBM Cloud Object Storage Requirements**
+## Key Features
 
-* It is required to have an **existing** IBM Cloud Object Storage (COS) instance and an **existing** bucket within this instance.
-* Bucket should be in **Regional resiliency location only**. Cross Region resiliency and Single data center options are not supported.
-* **Object versioning** and **object lock** must be **enabled on the bucket**.
+- ✅ **High Performance**: Parallel multistreaming with configurable concurrency
+- ✅ **Data Protection**: Object versioning, retention policies, and legal hold support
+- ✅ **Reliability**: Automatic retry logic with exponential backoff for network issues
+- ✅ **Flexibility**: Configurable chunk sizes, prefixes, and tagging
+- ✅ **Enterprise Ready**: Comprehensive logging and error handling
+- ✅ **SAP Certified**: Implements SAP Backint API specification
 
-2. **API key permissions**
+## Prerequisites
 
-* To authenticate and upload/restore from IBM Cloud Object storage, current authentication mechanism is using an API KEY with following permissions are required:
+### 1. System Requirements
 
-|**Role**|
-| - |
-| cloud-object-storage.bucket.head |
-| cloud-object-storage.bucket.get_lifecycle |
-| cloud-object-storage.bucket.get |
-| cloud-object-storage.object.put |
-| cloud-object-storage.object.post_complete_upload |
-| cloud-object-storage.object.post_initiate_upload |
-| cloud-object-storage.object.put_part |
-| cloud-object-storage.object.put_object_lock_retention |
-| cloud-object-storage.object.head |
-| cloud-object-storage.object.get |
-| cloud-object-storage.bucket.get_versioning |
+- **Operating System**: IBM Power Servers (ppc64le architecture).
+- **SAP HANA**: Compatible with SAP HANA 2.0 and later.
+- **Permissions**: User must have read/write access to SAP HANA directories.
+
+### 2. IBM Cloud Object Storage Requirements
+
+- **Existing COS Instance**: You must have an active IBM Cloud Object Storage instance.
+- **Existing Bucket**: A bucket must be created within the COS instance.
+- **Regional Resiliency**: Bucket must use **Regional resiliency location only**.
+  - ❌ Cross Region resiliency is **not supported**.
+- **Object Versioning**: Must be **enabled** on the bucket.
+- **Object Lock**: Must be **enabled** on the bucket.
+- **Endpoint Type**: Use **direct endpoints only** for optimal performance.
+
+### 3. Network Configuration (Recommended for Best Performance)
+
+For optimal backup performance, configure a Virtual Private Endpoint (VPE) gateway:
+
+1. **Create IBM Cloud VPC**: Set up a Virtual Private Cloud (VPC) in IBM Cloud.
+2. **Create VPE Gateway**: Create a Virtual Private Endpoint gateway of type **Cloud Object Storage** within the VPC.
+3. **Configure Transit Gateway**: Attach both the VPC and the Power Virtual Server Workspace to the same Transit Gateway to enable connectivity.
+4. **Update Hosts File**: Add the virtual private endpoint IP address and hostname to `/etc/hosts` on the Power Virtual Server instance:
+   ```bash
+   # Example entry in /etc/hosts
+   <VPE_IP_ADDRESS>  s3.direct.<region>.cloud-object-storage.appdomain.cloud
+   ```
+
+This configuration provides:
+- **Better Performance**: Direct, private network path to Cloud Object Storage
+- **Enhanced Security**: Traffic stays within IBM Cloud private network
+- **Lower Latency**: Reduced network hops compared to public endpoints
+
+### 4. API Key Permissions
+
+The API key used for authentication must have the following IBM Cloud IAM permissions:
+
+| Permission                                             |
+|--------------------------------------------------------|
+| cloud-object-storage.bucket.head                       |
+| cloud-object-storage.bucket.get_lifecycle              |
+| cloud-object-storage.bucket.get                        |
+| cloud-object-storage.object.put                        |
+| cloud-object-storage.object.post_complete_upload       |
+| cloud-object-storage.object.post_initiate_upload       |
+| cloud-object-storage.object.put_part                   |
+| cloud-object-storage.object.put_object_lock_retention  |
+| cloud-object-storage.object.head                       |
+| cloud-object-storage.object.get                        |
+| cloud-object-storage.bucket.get_versioning             |
 | cloud-object-storage.object.put_object_lock_legal_hold |
-| cloud-object-storage.object.head_version |
-| cloud-object-storage.bucket.get_versions |
-| cloud-object-storage.object.get_version |
+| cloud-object-storage.object.head_version               |
+| cloud-object-storage.bucket.get_versions               |
+| cloud-object-storage.object.get_version                |
 
+## Installation
 
-# Solution
+### Step 1: Download the Agent
 
-## Install the agent
+Download the latest release from the [GitHub releases page](https://github.com/IBM-Cloud/ibm-sap-hana-backint-cos/releases).
 
-1. Download the latest release from [github repository](https://github.com/IBM-Cloud/ibm-sap-hana-backint-cos/releases).
+The release is provided as a ZIP archive with the naming format:
+```
+ibm-sap-hana-backint-cos_<VERSION>_linux_ppc64le.zip
+```
 
-2. **Unpack the package** to a directory of your choice with the correct permissions in the system.
+**Automatic download of latest version:**
+```bash
+LATEST_VERSION=$(curl -s https://api.github.com/repos/IBM-Cloud/ibm-sap-hana-backint-cos/releases/latest | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/')
+wget https://github.com/IBM-Cloud/ibm-sap-hana-backint-cos/releases/download/v${LATEST_VERSION}/ibm-sap-hana-backint-cos_${LATEST_VERSION}_linux_ppc64le.zip
+```
 
-   The extracted package contains
+**Or download a specific version:**
+```bash
+VERSION=1.2.0  # Replace with desired version
+wget https://github.com/IBM-Cloud/ibm-sap-hana-backint-cos/releases/download/v${VERSION}/ibm-sap-hana-backint-cos_${VERSION}_linux_ppc64le.zip
+```
 
-   * `hdbbackint`: The IBM Backint agent **executable** for SAP HANA.
-   * `sample_hdbbackint.cfg`: A **sample configuration** file for IBM SAP HANA backint agent.
-   * `Readme.pdf`: Agent **manual**
+### Step 2: Extract the Archive
 
+```bash
+# If you used LATEST_VERSION variable
+unzip ibm-sap-hana-backint-cos_${LATEST_VERSION}_linux_ppc64le.zip
 
-3. **Create Symbolic Links**
+# Or if you used VERSION variable
+unzip ibm-sap-hana-backint-cos_${VERSION}_linux_ppc64le.zip
+```
 
-   SAP HANA expects the `hdbbackint` executable to be in the following path:
+The extracted package contains:
+- `hdbbackint`: The IBM Backint agent executable.
+- `sample_hdbbackint.cfg`: Sample configuration file.
+- `README.md`: Documentation.
+- `CHANGELOG.md`: Version history.
+- `LICENSE`: License information.
 
-   `/usr/sap/<SID>/SYS/global/hdb/opt/hdbbackint`
+### Step 3: Install to SAP HANA Directory
 
-   * Option 1: Copy the `hdbbackint` executable to the path `/usr/sap/<SID>/SYS/global/hdb/opt/`
-   * Option 2: Create a symbolic link that points from `/usr/sap/<SID>/SYS/global/hdb/opt/hdbbackint` to the `hdbbackint` executable that was extracted from the package.
+SAP HANA expects the `hdbbackint` executable at:
+```
+/usr/sap/<SID>/SYS/global/hdb/opt/hdbbackint
+```
 
+**Option 1: Copy the executable**
+```bash
+chmod +x hdbbackint
+sudo cp hdbbackint /usr/sap/<SID>/SYS/global/hdb/opt/hdbbackint
+```
 
-## Configure the IBM Backint agent for SAP HANA with IBM Cloud Object Storage
+**Option 2: Create a symbolic link**
+```bash
+chmod +x hdbbackint
+sudo ln -s $(pwd)/hdbbackint /usr/sap/<SID>/SYS/global/hdb/opt/hdbbackint
+```
 
-   The IBM Backint agent for SAP HANA with IBM Cloud Object Storage requires a parameter file in the INI file format.
+## Configuration
 
-   An example parameter file `sample_hdbbackint.cfg` is part of the release package.
+### Configuration File Structure
 
-   You can use this example file, or create a new configuration file.
+The IBM Backint agent requires a configuration file in INI format with the following sections:
 
-   Place the configuration file in a directory that has the permissions to allow SAP HANA to access it, preferably in path `/usr/sap/<SID>/SYS/global/hdb/opt/` where the executable exists.
+- **[cloud_storage]** (mandatory): IBM Cloud Object Storage connection settings.
+- **[backint]** (optional): Backint agent performance settings.
+- **[objects]** (optional): Object naming and retention settings.
+- **[trace]** (optional): Logging configuration.
 
+Place the configuration file in a directory accessible by SAP HANA, preferably:
+```
+/usr/sap/<SID>/SYS/global/hdb/opt/hdbbackint.cfg
+```
 
+### Configuration Parameters
 
-   The configuration file consists of the following sections:
+#### [cloud_storage] Section (Mandatory)
 
-   * cloud_storage (mandatory)
-   * backint (optional)
-   * objects (optional)
-   * trace (optional)
+| Parameter            | Values                                                                                                                          | Required | Description                                                                                                                      |
+|----------------------|---------------------------------------------------------------------------------------------------------------------------------|----------|----------------------------------------------------------------------------------------------------------------------------------|
+| `auth_mode`          | `apikey`                                                                                                                        | ✅ Yes   | Authentication method (currently only apikey supported).                                                                         |
+| `auth_keypath`       | `<file_path>`                                                                                                                   | ✅ Yes   | Full path to file containing IBM Cloud API key.                                                                                  |
+| `bucket`             | `<bucket_name>`                                                                                                                 | ✅ Yes   | Name of IBM Cloud Object Storage bucket.                                                                                         |
+| `region`             | `au-syd`, `br-sao`, `ca-tor`, `eu-de`, `eu-es`, `eu-gb`, `in-che`, `in-mum`, `jp-osa`, `jp-tok`, `us-east`, `us-south`                            | ✅ Yes   | Region of the COS bucket.                                                                                                        |
+| `endpoint_url`       | `<endpoint_url>`                                                                                                                | ✅ Yes   | Regional **direct** endpoint URL for the COS bucket (e.g., `https://s3.direct.us-south.cloud-object-storage.appdomain.cloud`).  |
+| `ibm_auth_endpoint`  | `https://private.iam.cloud.ibm.com/identity/token` or `https://iam.cloud.ibm.com/identity/token`                               | ⬜ No    | IAM authentication endpoint<br>**Default**: `https://private.iam.cloud.ibm.com/identity/token`                                   |
 
-   To make sure that the `hdbbackint` agent runs without errors, first the configuration file is validated. Defaults are set if these parameters are not defined in the file. The configuration file is mandatory to execute the `hdbbackint` agent.
+#### [objects] Section (Optional)
 
+| Parameter                        | Values                    | Required | Description                                                                                                                                                |
+|----------------------------------|---------------------------|----------|------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `remove_key_prefix`              | `<prefix_string>`         | ⬜ No    | String to remove from the beginning of backup file paths when creating object keys.                                                                        |
+| `additional_key_prefix`          | `<prefix_string>`         | ⬜ No    | String to prepend to object keys (useful for organizing backups by database).                                                                              |
+| `object_tags`                    | `<Key1=Val1,Key2=Val2>`   | ⬜ No    | Tags to apply to COS objects (max 10 key-value pairs).                                                                                                     |
+| `object_lock_retention_mode`     | `None`, `cmp`, `gov`      | ⬜ No    | Object retention mode. `cmp` = COMPLIANCE mode. `gov` = GOVERNANCE mode. <br>**Default**: `None`                                                                                     |
+| `object_lock_retention_period`   | `<years,months,days>`     | ⬜ No    | Retention period as comma-separated integers (e.g., `1,6,15` for 1 year, 6 months, 15 days). All three values required, at least one must be > 0.          |
+| `object_lock_legal_hold_status`  | `ON`, `OFF`               | ⬜ No    | Legal hold prevents deletion until disabled.<br>**Default**: `OFF`                                                                                         |
 
-   The configuration file consists of the following sections which contain key-value pair settings:
+#### [backint] Section (Optional)
 
+| Parameter                  | Values                     | Required | Description                                                                                                                                                  |
+|----------------------------|----------------------------|----------|--------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `max_concurrency`          | `<integer>`                | ⬜ No    | Number of concurrent upload threads per backup stream.<br>**Default**: `4`                                                                                   |
+| `recover_max_concurrency`  | `<integer>`                | ⬜ No    | Number of concurrent download threads during restore.<br>**Default**: `4`                                                                                    |
+| `multipart_chunksize`      | `<size>` or `<size><unit>` | ⬜ No    | Chunk size for multipart uploads. Units: `KB`, `MB`, `GB` (case-insensitive).<br>Examples: `134000000`, `100MB`, `1GB`.<br>**Default**: `134000000` (128 MB) |
 
-| Section       | Key                           | Possible Values                                                                            |           | Description                                                                                                                                                                                                                                                                                                                      |
-|---------------|-------------------------------|--------------------------------------------------------------------------------------------|-----------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| cloud_storage | auth_mode                     | apikey                                                                                     | Mandatory | Possible authentication options                                                                                                                                                                                                                                                                                                  |
-|               | auth_keypath                  | <api_key_file_path>                                                                        | Optional  | Full pathname to file containing the just the IBM Cloud api key.  Required if the auth_mode type is "apikey".                                                                                                                                                                                                                    |
-|               | bucket                        | <bucket_name>                                                                              | Mandatory | Name of Cloud Object Storage bucket                                                                                                                                                                                                                                                                                              |
-|               | region                        | au-syd, br-sao, ca-tor, eu-de, eu-es, eu-gb, jp-osa, jp-tok, us-east, us-south             | Mandatory | Region of Cloud Object Storage bucket                                                                                                                                                                                                                                                                                            |
-|               | endpoint_url                  | <endpoint_url>                                                                             | Mandatory | Endpoint URL of Cloud Object Storage bucket                                                                                                                                                                                                                                                                                      |
-|               | ibm_auth_endpoint             | https://private.iam.cloud.ibm.com/identity/token, https://iam.cloud.ibm.com/identity/token | Optional  | URL used for IAM authentication.  **Default**: https://private.iam.cloud.ibm.com/identity/token                                                                                                                                                                                                                                      |
-| objects       | remove_key_prefix             | <prefix_string>                                                                            | Optional  | Backint uses the whole pipe name as the storage key for backups.  You can specify a string to be removed from the resulting storage key.                                                                                                                                                                                         |
-|               | additional_key_prefix         | <prefix_string>                                                                            | Optional  | You can add database-specific prefix to the storage key for backups.                                                                                                                                                                                                                                                             |
-|               | object_tags                   | <Key1=Val1,Key2=Val2>                                                                      | Optional  | Tags added to Cloud Object storage object. A maximum of 10 key value pairs is supported.                                                                                                                                                                                                                                         |
-|               | object_lock_retention_mode    | None, cmp                                                                                  | Optional  | If set to "cmp", the Object Retention is switched on. For more information see [retention period](https://cloud.ibm.com/docs/cloud-object-storage?topic=cloud-object-storage-ol-overview#ol-terminology-retention-period) feature for IBM Cloud Object Storage.   **Default**: None                                              |
-|               | object_lock_retention_period  | <object_lock_retention_period>                                                             | Optional  | If set to "cmp", the Object Retention is switched on. For more information see retention period feature for IBM Cloud Object Storage.   **Default**: None                                                                                                                                                                        |
-|               | object_lock_legal_hold_status | ON, OFF                                                                                    | Optional  | A legal hold is like a retention period in that it prevents an object version from being overwritten or deleted. For more information see [legal hold](https://cloud.ibm.com/docs/cloud-object-storage?topic=cloud-object-storage-ol-overview#ol-terminology-legal-hold) feature for IBM Cloud object storage.  **Default**: OFF |
-| backint       | max_concurrency               | <value_integer>                                                                                  | Optional  | Number of concurrent requests made to IBM Cloud object Storage. This value should be configured based on system resources.  **Default**: 10                                                                                                                                                                                      |
-|               | multipart_chunksize           | <size_in_bytes> or `<size><unit>`, while `<unit>` can be one of the following: KB, MB or GB (not case sensitive), and `<size>` must not be 0.                                                                      | Optional  | Data transfer chunk size. This value should be configured based on system resources.  **Default**: 134000000                                                                                                                                                                                                                     |
-| trace         | agent_log_level               | debug, info, warning, error,critical, http                                                                | Optional  | Trace level for the IBM SAP HANA Backint Agent for IBM Cloud Object Storage.  **Default**: info                                                                                                                                                                                                                                  |
+#### [trace] Section (Optional)
+
+| Parameter          | Values                                                  | Required | Description                                     |
+|--------------------|---------------------------------------------------------|----------|-------------------------------------------------|
+| `agent_log_level`  | `debug`, `info`, `warning`, `error`, `critical`, `http` | ⬜ No    | Logging verbosity level.<br>**Default**: `info` |
 
 ### Key Prefixes
 
-Assuming starting a backup using the following command:
+The agent uses the full backup pipe name as the storage key by default. You can manipulate storage keys using prefix parameters.
 
-````
-BACKUP DATA FOR <dbname> USING BACKINT ('/usr/sap/<sid>/SYS/global/hdb/backint/DB_<dbname>/<identifier>)
-````
-
-By default, the `hdbbackint` agent uses the whole backup name `/usr/sap/<sid>/SYS/global/hdb/backint/DB_<dbname>/<identifier>_databackup<post_fix>` as the storage key for backups.
-
-To manipulate the storage keys, `hdbbackint` provides two parameters which can be defined in the `hdbbackint.cfg` file.
-
-**remove_key_prefix**
-
-The value of the key _remove_key_prefix_ specifies a string which will be removed from the beginning of the storage key name.
-
-For example the following setting
-
+**Example Backup Command:**
+```sql
+BACKUP DATA FOR <dbname> USING BACKINT ('/usr/sap/<sid>/SYS/global/hdb/backint/DB_<dbname>/<identifier>')
 ```
+
+**Default Storage Key:**
+```
+/usr/sap/<sid>/SYS/global/hdb/backint/DB_<dbname>/<identifier>_databackup<postfix>
+```
+
+#### Using remove_key_prefix
+
+Remove a prefix from the storage key:
+
+```ini
+[objects]
 remove_key_prefix = /usr/sap/<sid>/SYS/global/hdb/backint/
 ```
 
-will result in the shorter storage key: `DB_<dbname>/<identifier>_databackup<post_fix>`
-
-**additional_key_prefix**
-
-The value of the key _additional_key_prefix_ specifies a string which will be added to the beginning of the storage key name.
-
-For example:
-
+**Result:**
 ```
+DB_<dbname>/<identifier>_databackup<postfix>
+```
+
+#### Using additional_key_prefix
+
+Add a prefix to the storage key:
+
+```ini
+[objects]
 additional_key_prefix = myDB/
-````
-
-will prepend `myDB/` to the resulting storage key.
-
-For example, if the following options are used together:
-
 ```
+
+**Result:**
+```
+myDB/DB_<dbname>/<identifier>_databackup<postfix>
+```
+
+#### Combined Example
+
+```ini
+[objects]
 remove_key_prefix = /usr/sap/<sid>/SYS/global/hdb/backint/
-additional_key_prefix = myDB/
-````
-
-Then the final storage key will be:
-
-`myDB/DB_<dbname>/<identifier>_databackup<post_fix>`
-
-
-### Validate the hdbbackint configuration file
-
-The configuration file of the `hdbbackint` agent can be validated by executing the following command:
-
-```
-hdbbackint -p <hdbbackint_configuration_file> -check
+additional_key_prefix = PROD_HANA/
 ```
 
+**Final Storage Key:**
+```
+PROD_HANA/DB_<dbname>/<identifier>_databackup<postfix>
+```
 
-## Configure SAP HANA database to use the parameter File
+### Complete Configuration Example
 
-SAP HANA database uses the following parameters to configure the usage of the configuration file `hdbbackint.cfg`. These parameters are set in the `backup` section of the `global.ini` file. This file is located in `/usr/sap/<SAPSID>/SYS/global/hdb/custom/config/`.
+```ini
+[cloud_storage]
+auth_mode = apikey
+auth_keypath = /usr/sap/HDB/SYS/global/hdb/opt/apikey.txt
+bucket = my-hana-backups
+region = us-south
+endpoint_url = https://s3.direct.us-south.cloud-object-storage.appdomain.cloud
+ibm_auth_endpoint = https://private.iam.cloud.ibm.com/identity/token
+
+[objects]
+remove_key_prefix = /usr/sap/HDB/SYS/global/hdb/backint/
+additional_key_prefix = PROD_HDB/
+object_tags = Environment=Production,Application=SAP_HANA,Owner=DBA_Team
+object_lock_retention_mode = cmp
+object_lock_retention_period = 0,3,0
+object_lock_legal_hold_status = OFF
+
+[backint]
+max_concurrency = 4
+recover_max_concurrency = 4
+multipart_chunksize = 100MB
+
+[trace]
+agent_log_level = info
+```
+
+### Validate Configuration
+
+Before using the agent, validate your configuration file:
+
+```bash
+/usr/sap/<SID>/SYS/global/hdb/opt/hdbbackint -p /usr/sap/<SID>/SYS/global/hdb/opt/hdbbackint.cfg -check
+```
+
+A successful validation will output:
+```
+Configuration file is valid.
+```
+
+## SAP HANA Configuration
+
+Configure SAP HANA to use the Backint agent by setting parameters in the `[backup]` section of `global.ini`:
 
 ```
+/usr/sap/<SAPSID>/SYS/global/hdb/custom/config/global.ini
+```
+
+### Required Parameters
+
+```ini
 [backup]
-data_backup_parameter_file = <path_to_hdbbackint.cfg>
-log_backup_parameter_file = <path_to_hdbbackint.cfg>
-catalog_backup_parameter_file =< path_to_hdbbackint.cfg>
+data_backup_parameter_file = /usr/sap/<SID>/SYS/global/hdb/opt/hdbbackint.cfg
+log_backup_parameter_file = /usr/sap/<SID>/SYS/global/hdb/opt/hdbbackint.cfg
+catalog_backup_parameter_file = /usr/sap/<SID>/SYS/global/hdb/opt/hdbbackint.cfg
 catalog_backup_using_backint = true
 log_backup_using_backint = true
-parallel_data_backup_backint_channels = 8
-data_backup_buffer_size = 1024
+parallel_data_backup_backint_channels = 4
+data_backup_buffer_size = <refer table Buffer Size Recommendations below>
 parallel_data_backup_backint_size_threshold = 400
 backint_response_timeout = 1800
 ```
 
-* **data_backup_parameter_file**
+**Parameter Descriptions:**
 
-   Mandatory. Used or data backups.
+- **data_backup_parameter_file**: Path to configuration file for data backups (mandatory)
+- **log_backup_parameter_file**: Path to configuration file for log backups (required if using Backint for logs)
+- **catalog_backup_parameter_file**: Path to configuration file for catalog backups (required if using Backint for catalog)
+- **catalog_backup_using_backint**: Enable Backint for catalog backups
+- **log_backup_using_backint**: Enable Backint for log backups
+- **parallel_data_backup_backint_channels**: Number of parallel backup streams
+- **data_backup_buffer_size**: Buffer size in MB (see table below for recommendations)
+- **parallel_data_backup_backint_size_threshold**: Minimum backup size in GB to trigger parallel processing
+- **backint_response_timeout**: Timeout in seconds for Backint operations
 
-* **log_backup_parameter_file**
+#### Buffer Size Recommendations
 
-   If log backups are written using Backint, this parameter must be configured.
+| System Memory      | Recommended data_backup_buffer_size |
+|--------------------|-------------------------------------|
+| < 1 TB             | 1024 MB                             |
+| ≥ 1 TB and < 6 TB  | 2048 MB                             |
+| ≥ 6 TB and < 24 TB | 4096 MB                             |
+| ≥ 24 TB            | 4096 MB                             |
 
-* **catalog_backup_parameter_file**
+### Parameter Combinations
 
-   If catalog backups are done using Backint, this parameter must be configured.
+Recommended combinations of SAP HANA and Backint agent parameters for optimal performance:
 
-* **parallel_data_backup_backint_channels**
+| HANA: parallel_data_backup_backint_channels | Agent: max_concurrency | Total Concurrent Operations |
+|---------------------------------------------|------------------------|-----------------------------|
+| 8                                           | 4                      | 32                          |
+| 8                                           | 2                      | 16                          |
+| 4                                           | 4                      | 16                          |
+| 4                                           | 2                      | 8                           |
 
-   Specify the number of channels to be used for multistreaming.
+**Note**: Values above these combinations generally do not provide further performance improvements and may lead to resource bottlenecks.
 
-**Caution: After updating the entries it is important to run the `hdbnsutil -reconfig` command as sidadm user for the changes to take effect.**
+### Apply Configuration Changes
 
-### Recommended Configuration Parameters
+After updating `global.ini`, apply changes:
 
-The value of the **data_backup_buffer_size** parameter should be set based on the total memory available on the VM. The following sizes are recommended:
+```bash
+su - <sid>adm
+hdbnsutil -reconfig
+```
 
-| System Memory     | Recommended data_backup_buffer_size |
-| ------------------| ------------------------------------|
-| < 1TB             | 1024                                |
-| ≥ 1 TB and < 6TB  | 2048                                |
-| ≥ 6 TB and < 24TB | 4096                                |
-| ≥ 24 TB           | 4096                                |
+**⚠️ Important**: The `hdbnsutil -reconfig` command is required for changes to take effect.
 
-#### HANA & Backint Agent Recommended Parameter Combination
-This section lists recommended combinations of:
+## Architecture
 
-* **HANA parameter:**
+The IBM Backint agent implements a multi-threaded architecture:
 
-   **parallel_data_backup_backint_channels** defines how many Backint channels SAP HANA starts in parallel during a data backup.
-* **Backint Agent parameter:**
+1. **SAP HANA** initiates backup/restore operations via Backint API
+2. **Backint Agent** receives requests through named pipes
+3. **Upload/Download Manager** coordinates parallel operations
+4. **IBM COS SDK** handles multipart uploads and downloads with retry logic
+5. **IBM Cloud Object Storage** stores backup data with versioning and retention
 
-   **max_concurrency** controls the maximum number of parallel processing threads used by the `hdbbackint` agent.
+```
+┌─────────────┐
+│  SAP HANA   │
+└──────┬──────┘
+       │ Backint API
+       ▼
+┌─────────────────────┐
+│  Backint Agent      │
+│  - Config Parser    │
+│  - Pipe Manager     │
+│  - Concurrency Ctrl │
+└──────┬──────────────┘
+       │ IBM COS SDK
+       ▼
+┌─────────────────────┐
+│ IBM Cloud Object    │
+│ Storage (Regional)  │
+│  - Versioning       │
+│  - Object Lock      │
+│  - Retention        │
+└─────────────────────┘
+```
 
-These combinations help ensure optimal backup throughput and resource utilization.
+## Troubleshooting
 
+### Common Issues
 
-| HANA Parameter (parallel_data_backup_backint_channels) | Agent Parameter (max_concurrency) |
-| -------------------------------------------------------| ----------------------------------|
-| 8                                                      | 4                                 |
-| 8                                                      | 2                                 |
-| 4                                                      | 4                                 |
-| 4                                                      | 2                                 |
+**Issue**: Configuration validation fails
+```bash
+# Check file syntax
+cat /usr/sap/<SID>/SYS/global/hdb/opt/hdbbackint.cfg
 
-**Note: Values above these combinations generally do not provide further performance improvements and may lead to resource bottlenecks.**
+# Validate configuration
+hdbbackint -p /usr/sap/<SID>/SYS/global/hdb/opt/hdbbackint.cfg -check
+```
+
+**Issue**: Permission denied errors
+```bash
+# Check file permissions
+ls -la /usr/sap/<SID>/SYS/global/hdb/opt/hdbbackint*
+
+# Ensure <sid>adm can read files
+sudo chown <sid>adm:sapsys /usr/sap/<SID>/SYS/global/hdb/opt/hdbbackint*
+sudo chmod 750 /usr/sap/<SID>/SYS/global/hdb/opt/hdbbackint
+sudo chmod 640 /usr/sap/<SID>/SYS/global/hdb/opt/hdbbackint.cfg
+```
+
+**Issue**: API key authentication fails
+```bash
+# Verify API key file exists and is readable
+cat /path/to/apikey.txt
+
+# Test API key manually
+curl -X POST "https://private.iam.cloud.ibm.com/identity/token" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=urn:ibm:params:oauth:grant-type:apikey&apikey=$(cat /path/to/apikey.txt)"
+```
+
+**Issue**: Backup hangs or times out
+- Increase `backint_response_timeout` in SAP HANA configuration.
+- Check network connectivity to IBM Cloud Object Storage endpoint.
+- Review agent logs for detailed error messages.
+- Reduce `max_concurrency` if system resources are constrained.
+
+### Log Locations
+
+- **Backint Agent Logs**: Check SAP HANA trace directory
+  ```
+  /usr/sap/<SID>/HDB<instance>/trace/DB_<SID>/backint.log
+  ```
+- **SAP HANA Backup Logs**:
+  ```
+  /usr/sap/<SID>/HDB<instance>/trace/DB_<SID>/backup.log
+  ```
+
+## Performance Tuning
+
+### Upload Performance
+
+1. **Adjust max_concurrency**: Start with 4, increase if CPU/network allows.
+2. **Optimize multipart_chunksize**: Larger chunks (100-512MB) for high-bandwidth networks.
+3. **Increase parallel_data_backup_backint_channels**: Use 4-8 channels for large databases.
+4. **Tune data_backup_buffer_size**: Match to available system memory.
+
+### Download Performance
+
+- **Adjust recover_max_concurrency**: Start with 4, increase for faster restores.
+
+### Network Optimization
+
+- Use IBM Cloud Virtual private endpoint gateways for better performance and security.
+
+## Examples
+
+### Perform a Full Data Backup
+
+```sql
+-- Connect to SAP HANA
+hdbsql -u SYSTEM -d <DBNAME>
+
+-- Execute backup
+BACKUP DATA USING BACKINT ('/usr/sap/<SID>/SYS/global/hdb/backint/DB_<DBNAME>/FULL_BACKUP');
+```
+
+### Perform a Differential Backup
+
+```sql
+BACKUP DATA DIFFERENTIAL USING BACKINT ('/usr/sap/<SID>/SYS/global/hdb/backint/DB_<DBNAME>/DIFF_BACKUP');
+```
+
+### Restore from Backup
+
+```sql
+-- Recover to most recent state
+RECOVER DATABASE UNTIL TIMESTAMP '<timestamp>' USING BACKINT;
+
+-- Recover to specific backup
+RECOVER DATA USING BACKINT ('<backup_id>');
+```
+
+### List Available Backups
+
+```sql
+-- View backup catalog
+SELECT * FROM M_BACKUP_CATALOG ORDER BY SYS_START_TIME DESC;
+```
+
+## Contributing
+
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details on:
+
+- Code standards and formatting
+- Development setup
+- Pull request process
+- Commit signing requirements (DCO)
+
+## License
+
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+
+Copyright 2026 IBM Corp.
+
+## Support
+
+### Documentation
+
+- [Changelog](CHANGELOG.md) - Version history and release notes
+- [Security Policy](SECURITY.md) - Security vulnerability reporting
+- [SNAPPY Tools](docs/SNAPPYTOOLS.md) - Using the agent with SNAPPY tools
+
+### Getting Help
+
+- **Issues**: Report bugs or request features via [GitHub Issues](https://github.com/IBM-Cloud/ibm-sap-hana-backint-cos/issues)
+- **Discussions**: Ask questions in [GitHub Discussions](https://github.com/IBM-Cloud/ibm-sap-hana-backint-cos/discussions)
+- **Security**: Report security vulnerabilities privately via [SECURITY.md](SECURITY.md)
+
+### Related Resources
+
+- [IBM Cloud Object Storage Documentation](https://cloud.ibm.com/docs/cloud-object-storage)
+- [SAP HANA Backup and Recovery Guide](https://help.sap.com/docs/SAP_HANA_PLATFORM)
+- [SAP Note 3644731](https://me.sap.com/notes/3644731) - Official SAP Note for this agent
+
+---
+
+**Maintained by IBM Cloud**

@@ -24,3 +24,11 @@ Used for avoid concurrent writes/reads to/from the temporary memory holding
 the parts read from Cloud Object Storage
 */
 var writeToPipeLock sync.Mutex
+
+/*
+Map of mutexes per pipe to serialize writes to each individual pipe
+This prevents concurrent writes to the same pipe while allowing
+parallel writes to different pipes
+*/
+var pipeWriteMutexes = make(map[string]*sync.Mutex)
+var pipeWriteMutexesLock sync.Mutex
