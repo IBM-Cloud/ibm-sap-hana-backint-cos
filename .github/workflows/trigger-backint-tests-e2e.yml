@@ -70,7 +70,7 @@ jobs:
         uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ secrets.E2E_TESTS_PAT }}
-          repository: IBM-Cloud/powervs-sap-e2e-tests
+          repository: terraform-ibm-modules/powervs-sap-e2e-tests
           event-type: backint-pr-test
           client-payload: |
             {
