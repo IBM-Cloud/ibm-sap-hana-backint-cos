@@ -8,7 +8,7 @@ on:
     types: [ created ]
 
 permissions:
-  pull-requests: read
+  pull-requests: write
   issues: write
 
 jobs:
@@ -97,7 +97,7 @@ jobs:
               issue_number: ${{ steps.pr-details.outputs.pr_number }},
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `🚀 E2E backint tests triggered ${who}.\n\nMonitor progress → [powervs-sap-e2e-tests Actions](https://github.com/IBM-Cloud/powervs-sap-e2e-tests/actions/workflows/pr-backint-test.yml)`
+              body: `🚀 E2E backint tests triggered ${who}.\n\nMonitor progress → [powervs-sap-e2e-tests Actions](https://github.com/terraform-ibm-modules/powervs-sap-e2e-tests/actions/workflows/pr-backint-tests.yml)`
             })
 
       - name: Add reaction to trigger comment
