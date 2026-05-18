@@ -38,12 +38,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "pr_number=${{ github.event.pull_request.number }}"   >> $GITHUB_OUTPUT
-            echo "pr_sha=${{ github.event.pull_request.head.sha }}"    >> $GITHUB_OUTPUT
-            echo "pr_ref=${{ github.event.pull_request.head.ref }}"    >> $GITHUB_OUTPUT
-            echo "pr_title=${{ github.event.pull_request.title }}"     >> $GITHUB_OUTPUT
+            echo "pr_number=${{ github.event.pull_request.number }}"    >> $GITHUB_OUTPUT
+            echo "pr_sha=${{ github.event.pull_request.head.sha }}"     >> $GITHUB_OUTPUT
+            echo "pr_ref=${{ github.event.pull_request.head.ref }}"     >> $GITHUB_OUTPUT
+            echo "pr_title=${{ github.event.pull_request.title }}"      >> $GITHUB_OUTPUT
             echo "pr_author=${{ github.event.pull_request.user.login }}" >> $GITHUB_OUTPUT
-            echo "pr_url=${{ github.event.pull_request.html_url }}"    >> $GITHUB_OUTPUT
+            echo "pr_url=${{ github.event.pull_request.html_url }}"     >> $GITHUB_OUTPUT
           else
             # issue_comment on a PR — look up head SHA and ref
             PR_NUMBER="${{ github.event.issue.number }}"
