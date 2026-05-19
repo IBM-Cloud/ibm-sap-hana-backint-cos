@@ -1,0 +1,113 @@
+name: Trigger E2E Tests
+on:
+  pull_request:
+    branches: [ main, master ]
+    types: [ opened, synchronize, reopened ]
+
+  issue_comment:
+    types: [ created ]
+
+permissions:
+  pull-requests: write
+  issues: write
+
+jobs:
+  trigger-tests:
+    name: Trigger E2E Tests in powervs-sap-e2e-tests
+    runs-on: ubuntu-latest
+
+    # Run when:
+    #   1. PR is opened / updated / reopened  (pull_request event)
+    #   2. Someone comments "/run-e2e" on a PR (issue_comment event on a PR)
+    if: >-
+      github.event_name == 'pull_request'
+      || (
+        github.event_name == 'issue_comment'
+        && github.event.issue.pull_request
+        && contains(github.event.comment.body, '/run-e2e')
+      )
+
+    steps:
+      # ---------------------------------------------------------
+      # For issue_comment events we only have the issue/PR number,
+      # not the head SHA or ref. Fetch them from the PR API.
+      # ---------------------------------------------------------
+      - name: Resolve PR details
+        id: pr-details
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "pr_number=${{ github.event.pull_request.number }}"    >> $GITHUB_OUTPUT
+            echo "pr_sha=${{ github.event.pull_request.head.sha }}"     >> $GITHUB_OUTPUT
+            echo "pr_ref=${{ github.event.pull_request.head.ref }}"     >> $GITHUB_OUTPUT
+            echo "pr_title=${{ github.event.pull_request.title }}"      >> $GITHUB_OUTPUT
+            echo "pr_author=${{ github.event.pull_request.user.login }}" >> $GITHUB_OUTPUT
+            echo "pr_url=${{ github.event.pull_request.html_url }}"     >> $GITHUB_OUTPUT
+          else
+            # issue_comment on a PR — look up head SHA and ref
+            PR_NUMBER="${{ github.event.issue.number }}"
+            PR_JSON=$(curl -s \
+              -H "Authorization: token ${GITHUB_TOKEN}" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/${{ github.repository }}/pulls/${PR_NUMBER}")
+
+            PR_SHA=$(echo "${PR_JSON}"    | jq -r '.head.sha')
+            PR_REF=$(echo "${PR_JSON}"    | jq -r '.head.ref')
+            PR_TITLE=$(echo "${PR_JSON}"  | jq -r '.title')
+            PR_AUTHOR=$(echo "${PR_JSON}" | jq -r '.user.login')
+            PR_URL=$(echo "${PR_JSON}"    | jq -r '.html_url')
+
+            echo "pr_number=${PR_NUMBER}" >> $GITHUB_OUTPUT
+            echo "pr_sha=${PR_SHA}"       >> $GITHUB_OUTPUT
+            echo "pr_ref=${PR_REF}"       >> $GITHUB_OUTPUT
+            echo "pr_title=${PR_TITLE}"   >> $GITHUB_OUTPUT
+            echo "pr_author=${PR_AUTHOR}" >> $GITHUB_OUTPUT
+            echo "pr_url=${PR_URL}"       >> $GITHUB_OUTPUT
+          fi
+
+      - name: Trigger repository dispatch
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.E2E_TESTS_PAT }}
+          repository: terraform-ibm-modules/powervs-sap-e2e-tests
+          event-type: backint-pr-test
+          client-payload: |
+            {
+              "pr_number": "${{ steps.pr-details.outputs.pr_number }}",
+              "pr_sha": "${{ steps.pr-details.outputs.pr_sha }}",
+              "pr_ref": "${{ steps.pr-details.outputs.pr_ref }}",
+              "pr_title": "${{ steps.pr-details.outputs.pr_title }}",
+              "pr_author": "${{ steps.pr-details.outputs.pr_author }}",
+              "pr_url": "${{ steps.pr-details.outputs.pr_url }}",
+              "trigger": "${{ github.event_name }}",
+              "triggered_by": "${{ github.event.sender.login }}"
+            }
+
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const trigger = '${{ github.event_name }}';
+            const who = trigger === 'issue_comment'
+              ? `manually by @${{ github.event.comment.user.login }}`
+              : 'automatically on PR update';
+
+            github.rest.issues.createComment({
+              issue_number: ${{ steps.pr-details.outputs.pr_number }},
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `🚀 E2E backint tests triggered ${who}.\n\nMonitor progress → [powervs-sap-e2e-tests Actions](https://github.com/terraform-ibm-modules/powervs-sap-e2e-tests/actions/workflows/pr-backint-test.yml)`
+            })
+
+      - name: Add reaction to trigger comment
+        if: github.event_name == 'issue_comment'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.reactions.createForIssueComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: ${{ github.event.comment.id }},
+              content: 'rocket'
+            })
