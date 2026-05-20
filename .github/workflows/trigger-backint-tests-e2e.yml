@@ -15,6 +15,7 @@ jobs:
   trigger-tests:
     name: Trigger E2E Tests in powervs-sap-e2e-tests
     runs-on: ubuntu-latest
+    timeout-minutes: 120
 
     # Run when:
     #   1. PR is opened / updated / reopened  (pull_request event)
@@ -28,10 +29,6 @@ jobs:
       )
 
     steps:
-      # ---------------------------------------------------------
-      # For issue_comment events we only have the issue/PR number,
-      # not the head SHA or ref. Fetch them from the PR API.
-      # ---------------------------------------------------------
       - name: Resolve PR details
         id: pr-details
         env:
@@ -45,7 +42,6 @@ jobs:
             echo "pr_author=${{ github.event.pull_request.user.login }}" >> $GITHUB_OUTPUT
             echo "pr_url=${{ github.event.pull_request.html_url }}"     >> $GITHUB_OUTPUT
           else
-            # issue_comment on a PR — look up head SHA and ref
             PR_NUMBER="${{ github.event.issue.number }}"
             PR_JSON=$(curl -s \
               -H "Authorization: token ${GITHUB_TOKEN}" \
@@ -65,6 +61,11 @@ jobs:
             echo "pr_author=${PR_AUTHOR}" >> $GITHUB_OUTPUT
             echo "pr_url=${PR_URL}"       >> $GITHUB_OUTPUT
           fi
+
+      - name: Record dispatch timestamp
+        id: dispatch-time
+        run: |
+          echo "timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_OUTPUT
 
       - name: Trigger repository dispatch
         uses: peter-evans/repository-dispatch@v3
@@ -97,7 +98,7 @@ jobs:
               issue_number: ${{ steps.pr-details.outputs.pr_number }},
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `🚀 E2E backint tests triggered ${who}.\n\nMonitor progress → [powervs-sap-e2e-tests Actions](https://github.com/terraform-ibm-modules/powervs-sap-e2e-tests/actions/workflows/pr-backint-test.yml)`
+              body: `🚀 E2E backint tests triggered ${who}.\n\nMonitor progress → [powervs-sap-e2e-tests Actions](https://github.com/terraform-ibm-modules/powervs-sap-e2e-tests/actions/workflows/pr-backint-tests.yml)`
             })
 
       - name: Add reaction to trigger comment
@@ -110,4 +111,84 @@ jobs:
               repo: context.repo.repo,
               comment_id: ${{ github.event.comment.id }},
               content: 'rocket'
+            })
+
+      - name: Wait for E2E workflow to complete
+        env:
+          GH_TOKEN: ${{ secrets.E2E_TESTS_PAT }}
+          DISPATCH_TIME: ${{ steps.dispatch-time.outputs.timestamp }}
+          E2E_REPO: "terraform-ibm-modules/powervs-sap-e2e-tests"
+          WORKFLOW_FILE: "pr-backint-tests.yml"
+        run: |
+          echo "Waiting for E2E workflow to appear..."
+
+          # Wait up to 60s for the dispatched run to show up
+          RUN_ID=""
+          for i in $(seq 1 12); do
+            sleep 5
+            RUN_ID=$(curl -s \
+              -H "Authorization: token ${GH_TOKEN}" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/${E2E_REPO}/actions/workflows/${WORKFLOW_FILE}/runs?created=>=${DISPATCH_TIME}&event=repository_dispatch&per_page=5" \
+              | jq -r '.workflow_runs[0].id // empty')
+
+            if [ -n "${RUN_ID}" ]; then
+              echo "Found workflow run: ${RUN_ID}"
+              break
+            fi
+            echo "  Attempt ${i}/12 — waiting for run to appear..."
+          done
+
+          if [ -z "${RUN_ID}" ]; then
+            echo "::error::Could not find the dispatched workflow run after 60s"
+            exit 1
+          fi
+
+          RUN_URL="https://github.com/${E2E_REPO}/actions/runs/${RUN_ID}"
+          echo "Monitoring: ${RUN_URL}"
+
+          # Poll every 30s until the run completes
+          while true; do
+            RESPONSE=$(curl -s \
+              -H "Authorization: token ${GH_TOKEN}" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/${E2E_REPO}/actions/runs/${RUN_ID}")
+
+            STATUS=$(echo "${RESPONSE}" | jq -r '.status')
+            CONCLUSION=$(echo "${RESPONSE}" | jq -r '.conclusion // empty')
+
+            echo "  Status: ${STATUS} | Conclusion: ${CONCLUSION:-pending}"
+
+            if [ "${STATUS}" = "completed" ]; then
+              echo ""
+              echo "E2E workflow completed: ${CONCLUSION}"
+              echo "Run URL: ${RUN_URL}"
+
+              if [ "${CONCLUSION}" = "success" ]; then
+                echo "✓ E2E tests passed"
+                exit 0
+              else
+                echo "::error::E2E tests finished with conclusion: ${CONCLUSION}"
+                echo "Check details: ${RUN_URL}"
+                exit 1
+              fi
+            fi
+
+            sleep 60
+          done
+
+      - name: Update PR with final result
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const outcome = '${{ job.status }}';
+            const emoji = outcome === 'success' ? '✅' : '❌';
+            const status = outcome === 'success' ? 'passed' : 'failed';
+
+            github.rest.issues.createComment({
+              issue_number: ${{ steps.pr-details.outputs.pr_number }},
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `${emoji} E2E backint tests **${status}**.\n\nDetails → [powervs-sap-e2e-tests Actions](https://github.com/terraform-ibm-modules/powervs-sap-e2e-tests/actions/workflows/pr-backint-tests.yml)`
             })
