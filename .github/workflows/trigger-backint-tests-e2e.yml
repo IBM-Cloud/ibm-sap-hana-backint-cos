@@ -72,7 +72,7 @@ jobs:
         with:
           token: ${{ secrets.E2E_TESTS_PAT }}
           repository: terraform-ibm-modules/powervs-sap-e2e-tests
-          event-type: Backint PR Test
+          event-type: backint-pr-test
           client-payload: |
             {
               "pr_number": "${{ steps.pr-details.outputs.pr_number }}",
