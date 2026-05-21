@@ -1,11 +1,11 @@
 name: Trigger E2E Tests
 on:
   pull_request:
-    branches: [ main, master ]
-    types: [ opened, synchronize, reopened ]
+    branches: [main, master]
+    types: [opened, synchronize, reopened]
 
   issue_comment:
-    types: [ created ]
+    types: [created]
 
 permissions:
   pull-requests: write
@@ -98,7 +98,7 @@ jobs:
               issue_number: ${{ steps.pr-details.outputs.pr_number }},
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `🚀 E2E backint tests triggered ${who}.\n\nMonitor progress → [powervs-sap-e2e-tests Actions](https://github.com/terraform-ibm-modules/powervs-sap-e2e-tests/actions/workflows/pr-backint-tests.yml)`
+              body: `🚀 E2E backint tests triggered ${who}.\n\nMonitor progress → [powervs-sap-e2e-tests Actions](https://github.com/terraform-ibm-modules/powervs-sap-e2e-tests/actions/workflows/backint-pr.yml)`
             })
 
       - name: Add reaction to trigger comment
@@ -118,7 +118,7 @@ jobs:
           GH_TOKEN: ${{ secrets.E2E_TESTS_PAT }}
           DISPATCH_TIME: ${{ steps.dispatch-time.outputs.timestamp }}
           E2E_REPO: "terraform-ibm-modules/powervs-sap-e2e-tests"
-          WORKFLOW_FILE: "pr-backint-test.yml"
+          WORKFLOW_FILE: "backint-pr.yml"
         run: |
           echo "Waiting for E2E workflow to appear..."
 
@@ -190,5 +190,5 @@ jobs:
               issue_number: ${{ steps.pr-details.outputs.pr_number }},
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `${emoji} E2E backint tests **${status}**.\n\nDetails → [powervs-sap-e2e-tests Actions](https://github.com/terraform-ibm-modules/powervs-sap-e2e-tests/actions/workflows/pr-backint-test.yml)`
+              body: `${emoji} E2E backint tests **${status}**.\n\nDetails → [powervs-sap-e2e-tests Actions](https://github.com/terraform-ibm-modules/powervs-sap-e2e-tests/actions/workflows/backint-pr.yml)`
             })
