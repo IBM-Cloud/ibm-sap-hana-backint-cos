@@ -68,7 +68,7 @@ jobs:
           echo "timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_OUTPUT
 
       - name: Trigger repository dispatch
-        uses: peter-evans/repository-dispatch@v3
+        uses: peter-evans/repository-dispatch@v4
         with:
           token: ${{ secrets.E2E_TESTS_PAT }}
           repository: terraform-ibm-modules/powervs-sap-e2e-tests
