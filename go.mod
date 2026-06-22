@@ -7,7 +7,7 @@ require (
 	github.com/bigkevmcd/go-configparser v0.0.0-20251110123434-de62ed489b4f
 	github.com/sirupsen/logrus v1.9.4
 	golang.org/x/net v0.55.0
-	golang.org/x/sys v0.45.0
+	golang.org/x/sys v0.46.0
 )
 
 require (
