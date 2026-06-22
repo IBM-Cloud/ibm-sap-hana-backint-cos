@@ -3,7 +3,7 @@ module github.com/ibm-cloud/ibm-sap-hana-backint-cos
 go 1.25.0
 
 require (
-	github.com/IBM/ibm-cos-sdk-go v1.14.0
+	github.com/IBM/ibm-cos-sdk-go v1.14.1
 	github.com/bigkevmcd/go-configparser v0.0.0-20251110123434-de62ed489b4f
 	github.com/sirupsen/logrus v1.9.4
 	golang.org/x/net v0.55.0
@@ -11,7 +11,7 @@ require (
 )
 
 require (
-	github.com/IBM/go-sdk-core/v5 v5.21.2 // indirect
+	github.com/IBM/go-sdk-core/v5 v5.21.4 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.13 // indirect
 	github.com/go-openapi/errors v0.22.7 // indirect
 	github.com/go-openapi/strfmt v0.26.1 // indirect
