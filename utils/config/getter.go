@@ -42,14 +42,14 @@ Getting the additional key prefix
 used for setting the object name in IBM Cloud object storage
 */
 func (b BackintConfigT) AdditionalKeyPrefix() string {
-	return b.Get("additional_key_prefix")
+	return b.Get(additional_key_prefix.key)
 }
 
 /*
 Getting the logging level in uppercase
 */
 func (b BackintConfigT) AgentLogLevelU() string {
-	return strings.ToUpper(b.Get("agent_log_level"))
+	return strings.ToUpper(b.Get(agent_log_level.key))
 }
 
 /*
@@ -63,63 +63,63 @@ func (b BackintConfigT) Apikey() string {
 Getting the path to the apikey file
 */
 func (b BackintConfigT) AuthKeypath() string {
-	return b.Get("auth_keypath")
+	return b.Get(auth_keypath.key)
 }
 
 /*
-Getting the authentication method
+Getting the authentication mode
 */
-func (b BackintConfigT) AuthMethod() string {
-	return b.Get("auth_mode")
+func (b BackintConfigT) AuthMode() string {
+	return b.Get(auth_mode.key)
 }
 
 /*
 Getting the bucket name
 */
 func (b BackintConfigT) BucketName() string {
-	return b.Get("bucket")
+	return b.Get(bucket.key)
 }
 
 /*
 Getting the endpoint url
 */
 func (b BackintConfigT) EndpointUrl() string {
-	return b.Get("endpoint_url")
+	return b.Get(endpoint_url.key)
 }
 
 /*
 Getting the IBM Authorization endpoint
 */
 func (b BackintConfigT) IBMAuthEndpoint() string {
-	return b.Get("ibm_auth_endpoint")
+	return b.Get(ibm_auth_endpoint.key)
 }
 
 /*
 Getting the maximum concurrency
 */
 func (b BackintConfigT) MaxConcurrency() int {
-	return global.ToInteger(b.Get("max_concurrency"))
+	return global.ToInteger(b.Get(max_concurrency.key))
 }
 
 /*
 Getting the multipart chunksize
 */
 func (b BackintConfigT) MultipartChunksize() int64 {
-	return int64(global.ToInteger(b.Get("multipart_chunksize")))
+	return int64(global.ToInteger(b.Get(multipart_chunksize.key)))
 }
 
 /*
 Getting the status of the object lock legal hold
 */
 func (b BackintConfigT) ObjectLockLegalHoldStatus() string {
-	return b.Get("object_lock_legal_hold_status")
+	return b.Get(object_lock_legal_hold_status.key)
 }
 
 /*
 Getting the object lock retention mode
 */
 func (b BackintConfigT) ObjectLockRetentionMode() string {
-	return strings.ToLower(b.Get("object_lock_retention_mode"))
+	return strings.ToLower(b.Get(object_lock_retention_mode.key))
 }
 
 /*
@@ -144,7 +144,7 @@ func (b BackintConfigT) ObjectLockRetentionDate() time.Time {
 Getting the object lock retention period
 */
 func (b BackintConfigT) ObjectLockRetentionPeriod() string {
-	return b.Get("object_lock_retention_period")
+	return b.Get(object_lock_retention_period.key)
 }
 
 /*
@@ -152,35 +152,28 @@ Getting the max concurrency for recovery
 If set to 0, we take the value from max_concurrency
 */
 func (b BackintConfigT) RecoverMaxConcurrency() int {
-	return global.ToInteger(b.Get("recover_max_concurrency"))
+	return global.ToInteger(b.Get(recover_max_concurrency.key))
 }
 
 /*
 Getting the region
 */
 func (b BackintConfigT) Region() string {
-	return b.Get("region")
+	return b.Get(region.key)
 }
 
 /*
 Getting the key prefix to be removed
 */
 func (b BackintConfigT) RemoveKeyPrefix() string {
-	return b.Get("remove_key_prefix")
-}
-
-/*
-Getting the service Instance Id
-*/
-func (b BackintConfigT) ServiceInstanceId() string {
-	return b.Get("service_instance_id")
+	return b.Get(remove_key_prefix.key)
 }
 
 /*
 Getting the tags
 */
 func (b BackintConfigT) Tags() string {
-	tags := b.Get("object_tags")
+	tags := b.Get(object_tags.key)
 	if tags != "" {
 		tags = strings.ReplaceAll(tags, ",", "&")
 	}
@@ -191,5 +184,5 @@ func (b BackintConfigT) Tags() string {
 Getting the timeout
 */
 func (b BackintConfigT) Timeout() int {
-	return global.ToInteger(b.Get("timeout_microsecond"))
+	return global.ToInteger(b.Get(timeout_microsecond.key))
 }

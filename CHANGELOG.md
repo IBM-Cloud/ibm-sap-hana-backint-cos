@@ -1,3 +1,30 @@
+# 2.0.0 (June 30, 2026)
+
+## **New Features**
+
+* **PowerVS OAuth Authentication (`auth_mode = oauth`)**
+  Added a new keyless authentication mode for SAP HANA backup agents running on IBM Power Virtual Server.
+  Set `auth_mode = oauth` to authenticate via the VPC Instance Metadata Service — no API key required.
+  Tokens are automatically obtained and refreshed; the provider proactively renews 5 minutes before expiry
+  so no in-flight S3 request ever sees a 401. The IAM `refresh_token` flow is deliberately bypassed as
+  PowerVS-sourced tokens carry no refresh token. Existing `auth_mode = apikey` configurations are
+  **fully compatible and require no changes**.
+
+## **Bug Fixes**
+
+* **Fixed Backup Upload Failure — TCP Write Timeout on PowerVS**
+  On PowerVS, a stateful firewall can silently drop a long-running PUT TCP connection mid-part, causing
+  a `write: connection timed out` error. The default SDK retryer treated this as non-retryable.
+  A custom `cosRetryer` now wraps the SDK's `DefaultRetryer` and explicitly retries on write timeouts,
+  re-dialling a fresh socket for each attempt (max 5 retries).
+
+## **Dependency Updates**
+
+* **IBM Cloud Go SDK**: added `github.com/IBM/go-sdk-core/v5` for `VpcInstanceAuthenticator`
+* **Go**: 1.25.0 → 1.26.1
+
+---
+
 # 1.2.0 (April 9, 2026)
 
 ## **New Features**

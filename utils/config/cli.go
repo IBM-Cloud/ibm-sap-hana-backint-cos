@@ -57,6 +57,7 @@ func parseArguments() global.CommandLineArguments {
 	source := flag.String("source", "", "source file path")
 	key := flag.String("key", "", "object name")
 	resultFile := flag.String("r", "", "file containing values")
+	authMode := flag.String("authmode", AUTH_APIKEY, "authentication mode, one of: apikey, oauth")
 
 	// Version
 	var version bool
@@ -81,6 +82,7 @@ func parseArguments() global.CommandLineArguments {
 	global.Args.CheckParms = checkParms
 
 	// Used when called from snappy agent
+	global.Args.AuthMode = *authMode
 	global.Args.AuthKeypath = *authKeypath
 	global.Args.AuthEndpoint = *authEndpoint
 	global.Args.EndpointUrl = *endpointUrl
@@ -206,10 +208,12 @@ func dbBackupParametersValid(function string) bool {
 		return false
 	}
 
-	if isFileValid(global.Args.AuthKeypath, true) != "" {
-		fmt.Println("You must specify a valid path to the " +
-			"file containing your apikey.")
-		return false
+	if global.Args.AuthMode == AUTH_APIKEY {
+		if isFileValid(global.Args.AuthKeypath, true) != "" {
+			fmt.Println("You must specify a valid path to the " +
+				"file containing your apikey.")
+			return false
+		}
 	}
 
 	if function == global.BUCKET_GET_LIFECYCLE ||

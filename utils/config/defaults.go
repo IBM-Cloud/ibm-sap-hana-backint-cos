@@ -17,19 +17,18 @@ package config
 /*
 cloud_storage Section
 */
-var auth_keypath = Default{
-	key:            "auth_keypath",
-	section:        SECTION_CLOUD_STORAGE,
-	mandatory:      true,
-	validationType: CONFIG_FILE}
-
 var auth_mode = Default{
 	key:            "auth_mode",
 	section:        SECTION_CLOUD_STORAGE,
 	mandatory:      true,
-	defaultValue:   AUTH_APIKEY,
-	possibleValues: []string{AUTH_APIKEY},
+	possibleValues: []string{AUTH_APIKEY, AUTH_TRUSTEDPROFILE},
 	validationType: CONFIG_LIST}
+
+var auth_keypath = Default{
+	key:            "auth_keypath",
+	section:        SECTION_CLOUD_STORAGE,
+	mandatory:      false,
+	validationType: CONFIG_FILE}
 
 var bucket = Default{
 	key:            "bucket",
