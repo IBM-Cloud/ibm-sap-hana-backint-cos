@@ -70,3 +70,9 @@ var OBJECTLOCKMODES = map[string]string{
 // Default pipe buffer size used for recovery in case
 // the system call to get the buffer size produces an error
 const PIPE_BUFFER_SIZE = 1024 * 1024 * 1024
+
+// PowerVS metadata service constants
+const (
+	METADATA_SERVICE_URL = "https://api.metadata.power-iaas.cloud.ibm.com"
+	SERVICE_VERSION      = "2025-08-26"
+)

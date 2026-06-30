@@ -28,6 +28,7 @@ type CommandLineArguments struct {
 	CheckParms      bool
 
 	// Arguments used in case hdbbackint is called by snappy agent
+	AuthMode     string
 	AuthKeypath  string
 	AuthEndpoint string
 	Region       string
