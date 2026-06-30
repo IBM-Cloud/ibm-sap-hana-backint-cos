@@ -46,11 +46,7 @@ repos:
     rev: v2.6.1
     hooks:
       - id: golangci-lint
-        entry: bash -c "golangci-lint run ./..."
-        language: system
-        pass_filenames: false
-        always_run: true
-        types: [go]
+        args: [--fix]
   - repo: https://github.com/syntaqx/git-hooks
     rev: v0.0.18
     hooks:
