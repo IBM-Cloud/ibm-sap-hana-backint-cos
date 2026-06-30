@@ -84,9 +84,9 @@ This configuration provides:
 - **Enhanced Security**: Traffic stays within IBM Cloud private network
 - **Lower Latency**: Reduced network hops compared to public endpoints
 
-### 4. API Key Permissions
+### 4. Authentication Methods
 
-The API key used for authentication must have the following IBM Cloud IAM permissions:
+The IBM Backint agent supports two authentication methods: **API Key** and **OAuth / Trusted Profile**. Regardless of which method you choose, the identity used for authentication must hold the following IBM Cloud IAM permissions on the target COS bucket:
 
 | Permission                                             |
 |--------------------------------------------------------|
@@ -105,6 +105,38 @@ The API key used for authentication must have the following IBM Cloud IAM permis
 | cloud-object-storage.object.head_version               |
 | cloud-object-storage.bucket.get_versions               |
 | cloud-object-storage.object.get_version                |
+
+#### OAuth / Trusted Profile Authentication (`oauth`) — Recommended
+
+This is the recommended method when running on IBM Power Virtual Server (PowerVS). Instead of managing API keys, the agent uses the PowerVS instance metadata service to obtain and refresh IAM tokens automatically via IBM Cloud SDK's `VpcInstanceAuthenticator`.
+
+**Benefits over API Key authentication:**
+- Tokens are obtained and refreshed automatically — no manual rotation needed.
+- No API key is stored on disk, reducing the risk of credential exposure.
+- The identity is tied to the compute instance itself via a Trusted Profile, not to an individual user or service ID.
+
+**Setting up a Trusted Profile for PowerVS:**
+1. In IBM Cloud IAM, create a **Trusted Profile** and add a trust relationship for your PowerVS Virtual Server Instance (matched by CRN, resource group, or tag).
+2. Assign the trusted profile the COS permissions listed above.
+3. Link the trusted profile to the PowerVS instance (via the instance's metadata or at provisioning time).
+
+**Agent configuration:**
+1. Set `auth_mode = oauth` in the configuration file.
+2. Do **not** set `auth_keypath` — it is not used in this mode.
+3. Do **not** set `ibm_auth_endpoint` — it is only applicable for `apikey` mode.
+
+> **Note**: OAuth authentication requires access to the PowerVS instance metadata service at `https://api.metadata.power-iaas.cloud.ibm.com`. It is only available on IBM Power Virtual Server instances.
+
+
+#### API Key Authentication (`apikey`)
+
+Use an IBM Cloud IAM API key when running outside of PowerVS, or when you prefer explicit credential management.
+
+1. Create a Service ID (or use an existing one) and assign it the permissions listed above.
+2. Generate an API key for that Service ID.
+3. Set `auth_mode = apikey` and provide the path to the key file via `auth_keypath` in the configuration file.
+4. Optionally set `ibm_auth_endpoint` to target a specific IAM token endpoint.
+
 
 ## Installation
 
@@ -187,12 +219,12 @@ Place the configuration file in a directory accessible by SAP HANA, preferably:
 
 | Parameter            | Values                                                                                                                          | Required | Description                                                                                                                      |
 |----------------------|---------------------------------------------------------------------------------------------------------------------------------|----------|----------------------------------------------------------------------------------------------------------------------------------|
-| `auth_mode`          | `apikey`                                                                                                                        | ✅ Yes   | Authentication method (currently only apikey supported).                                                                         |
-| `auth_keypath`       | `<file_path>`                                                                                                                   | ✅ Yes   | Full path to file containing IBM Cloud API key.                                                                                  |
+| `auth_mode`          | `apikey`, `oauth`                                                                                                               | ✅ Yes   | Authentication method.<br>- `apikey`: Use IBM Cloud API key<br>- `oauth`: Use PowerVS instance metadata service via trusted IAM profile (automatic token refresh) |
+| `auth_keypath`       | `<file_path>`                                                                                                                   | ✅ Yes (for `apikey` mode only)<br>⬜ Not used (for `oauth` mode) | Full path to file containing IBM Cloud API key. Must not be set when `auth_mode=oauth`.                                         |
 | `bucket`             | `<bucket_name>`                                                                                                                 | ✅ Yes   | Name of IBM Cloud Object Storage bucket.                                                                                         |
-| `region`             | `au-syd`, `br-sao`, `ca-tor`, `eu-de`, `eu-es`, `eu-gb`, `in-che`, `in-mum`, `jp-osa`, `jp-tok`, `us-east`, `us-south`                            | ✅ Yes   | Region of the COS bucket.                                                                                                        |
+| `region`             | `au-syd`, `br-sao`, `ca-tor`, `eu-de`, `eu-es`, `eu-gb`, `in-che`, `in-mum`, `jp-osa`, `jp-tok`, `us-east`, `us-south`        | ✅ Yes   | Region of the COS bucket.                                                                                                        |
 | `endpoint_url`       | `<endpoint_url>`                                                                                                                | ✅ Yes   | Regional **direct** endpoint URL for the COS bucket (e.g., `https://s3.direct.us-south.cloud-object-storage.appdomain.cloud`).  |
-| `ibm_auth_endpoint`  | `https://private.iam.cloud.ibm.com/identity/token` or `https://iam.cloud.ibm.com/identity/token`                               | ⬜ No    | IAM authentication endpoint<br>**Default**: `https://private.iam.cloud.ibm.com/identity/token`                                   |
+| `ibm_auth_endpoint`  | `https://private.iam.cloud.ibm.com/identity/token` or `https://iam.cloud.ibm.com/identity/token`                               | ⬜ No (`apikey` mode only) | IAM authentication endpoint. **Only applicable when `auth_mode=apikey`** — must not be set for `oauth` mode.<br>**Default**: `https://private.iam.cloud.ibm.com/identity/token` |
 
 #### [objects] Section (Optional)
 
@@ -276,27 +308,51 @@ PROD_HANA/DB_<dbname>/<identifier>_databackup<postfix>
 
 ### Complete Configuration Example
 
+#### OAuth / Trusted Profile (recommended for PowerVS)
+
 ```ini
 [cloud_storage]
-auth_mode = apikey
-auth_keypath = /usr/sap/HDB/SYS/global/hdb/opt/apikey.txt
-bucket = my-hana-backups
-region = us-south
-endpoint_url = https://s3.direct.us-south.cloud-object-storage.appdomain.cloud
-ibm_auth_endpoint = https://private.iam.cloud.ibm.com/identity/token
+auth_mode    = oauth
+bucket       = my-hana-backups
+region       = eu-de
+endpoint_url = https://s3.direct.eu-de.cloud-object-storage.appdomain.cloud
 
 [objects]
-remove_key_prefix = /usr/sap/HDB/SYS/global/hdb/backint/
+remove_key_prefix     = /usr/sap/HDB/SYS/global/hdb/backint/
 additional_key_prefix = PROD_HDB/
-object_tags = Environment=Production,Application=SAP_HANA,Owner=DBA_Team
-object_lock_retention_mode = cmp
-object_lock_retention_period = 0,3,0
+object_tags           = Environment=Production,Application=SAP_HANA,Owner=DBA_Team
+
+[backint]
+max_concurrency         = 4
+recover_max_concurrency = 4
+multipart_chunksize     = 512MB
+
+[trace]
+agent_log_level = info
+```
+
+#### API Key
+
+```ini
+[cloud_storage]
+auth_mode    = apikey
+auth_keypath = /usr/sap/HDB/SYS/global/hdb/opt/apikey.txt
+bucket       = my-hana-backups
+region       = us-south
+endpoint_url = https://s3.direct.us-south.cloud-object-storage.appdomain.cloud
+
+[objects]
+remove_key_prefix             = /usr/sap/HDB/SYS/global/hdb/backint/
+additional_key_prefix         = PROD_HDB/
+object_tags                   = Environment=Production,Application=SAP_HANA,Owner=DBA_Team
+object_lock_retention_mode    = cmp
+object_lock_retention_period  = 0,3,0
 object_lock_legal_hold_status = OFF
 
 [backint]
-max_concurrency = 4
+max_concurrency         = 4
 recover_max_concurrency = 4
-multipart_chunksize = 100MB
+multipart_chunksize     = 100MB
 
 [trace]
 agent_log_level = info

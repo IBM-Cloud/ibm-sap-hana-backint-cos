@@ -175,6 +175,10 @@ func updateConfigWithDefaults(basicConfig []Default) BackintConfigT {
 Reading the apikey from file "auth_keypath" and storing the value in map
 */
 func updateConfigWithApikey(backintConfig BackintConfigT) BackintConfigT {
+	if backintConfig.AuthMode() == AUTH_TRUSTEDPROFILE {
+		return backintConfig
+	}
+
 	apikey, err := global.ReadApikeyFromFile(backintConfig.AuthKeypath())
 	if err != nil {
 		fmt.Printf("Could not discover the apikey."+

@@ -257,6 +257,58 @@ lock retention belong to more than one parameter
 */
 func validateSpecial(basicConfig []Default) {
 	validateLockRetention(basicConfig)
+	validateAuthKeypath(basicConfig)
+	validateIBMAuthEndpoint(basicConfig)
+}
+
+/*
+Validates that ibm_auth_endpoint is not specified when auth_mode is oauth.
+It is only relevant for apikey mode.
+*/
+func validateIBMAuthEndpoint(basicConfig []Default) {
+	authMode := getObjForKey(basicConfig, "auth_mode")
+	if authMode.configValue == AUTH_TRUSTEDPROFILE {
+		endpoint := getObjForKey(basicConfig, "ibm_auth_endpoint")
+		if endpoint.configValue != "" {
+			message := fmt.Sprintf("%s: 'ibm_auth_endpoint' is not applicable"+
+				" when auth_mode is '%s'. Remove it from the configuration.",
+				VALIDATION_ERROR,
+				AUTH_TRUSTEDPROFILE,
+			)
+			if global.Args.CheckParms {
+				checkParmMessages = append(checkParmMessages, "\t"+message)
+			}
+			invalidValues = append(invalidValues, InvalidValue{
+				errorMessage: message,
+				invalidParm:  endpoint,
+			})
+		}
+	}
+}
+
+/*
+Validates that auth_keypath is provided when auth_mode is apikey
+*/
+func validateAuthKeypath(basicConfig []Default) {
+	authMode := getObjForKey(basicConfig, "auth_mode")
+	if authMode.configValue == AUTH_APIKEY {
+		keypath := getObjForKey(basicConfig, "auth_keypath")
+		if keypath.configValue == "" {
+			message := fmt.Sprintf("%s: You did not specify a value"+
+				" for the mandatory parameter 'auth_keypath'."+
+				" It is required when auth_mode is '%s'.",
+				VALIDATION_ERROR,
+				AUTH_APIKEY,
+			)
+			if global.Args.CheckParms {
+				checkParmMessages = append(checkParmMessages, "\t"+message)
+			}
+			invalidValues = append(invalidValues, InvalidValue{
+				errorMessage: message,
+				invalidParm:  keypath,
+			})
+		}
+	}
 }
 
 /*

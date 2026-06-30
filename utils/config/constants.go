@@ -72,7 +72,8 @@ const MAX_NUMBER_OF_TAGS int = 10
 
 // Modes for authentication method
 const (
-	AUTH_APIKEY string = "apikey"
+	AUTH_APIKEY         string = "apikey"
+	AUTH_TRUSTEDPROFILE string = "oauth"
 )
 
 // Unsupported keywords in inputfile
