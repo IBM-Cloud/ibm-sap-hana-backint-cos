@@ -3,7 +3,7 @@ module github.com/ibm-cloud/ibm-sap-hana-backint-cos
 go 1.26.0
 
 require (
-	github.com/IBM/go-sdk-core/v5 v5.22.1
+	github.com/IBM/go-sdk-core/v5 v5.22.0
 	github.com/IBM/ibm-cos-sdk-go v1.14.1
 	github.com/bigkevmcd/go-configparser v0.0.0-20251110123434-de62ed489b4f
 	github.com/sirupsen/logrus v1.9.4

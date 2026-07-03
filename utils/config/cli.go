@@ -49,15 +49,9 @@ func parseArguments() global.CommandLineArguments {
 	backupId := flag.Int("s", -1, "Backup Id")
 	numberOfObjects := flag.Int("c", -1, "Number of objects")
 	backupLevel := flag.String("l", "", "backup level")
-	authKeypath := flag.String("keypath", "", "path to the apikey file")
-	authEndpoint := flag.String("authendpoint", "https://private.iam.cloud.ibm.com/identity/token", "IBM auth endpoint")
-	region := flag.String("region", "", "region")
-	endpointUrl := flag.String("endpoint", "", "endpoint url")
-	bucket := flag.String("bucket", "", "bucket name")
 	source := flag.String("source", "", "source file path")
 	key := flag.String("key", "", "object name")
 	resultFile := flag.String("r", "", "file containing values")
-	authMode := flag.String("authmode", AUTH_APIKEY, "authentication mode, one of: apikey, oauth")
 
 	// Version
 	var version bool
@@ -82,12 +76,6 @@ func parseArguments() global.CommandLineArguments {
 	global.Args.CheckParms = checkParms
 
 	// Used when called from snappy agent
-	global.Args.AuthMode = *authMode
-	global.Args.AuthKeypath = *authKeypath
-	global.Args.AuthEndpoint = *authEndpoint
-	global.Args.EndpointUrl = *endpointUrl
-	global.Args.Region = *region
-	global.Args.Bucket = *bucket
 	global.Args.Source = *source
 	global.Args.Key = *key
 	global.Args.ResultFile = *resultFile
@@ -137,10 +125,6 @@ func argsValid() bool {
 		return false
 	}
 
-	if isDbBackupFunction(global.Args.Function) {
-		return dbBackupParametersValid(global.Args.Function)
-	}
-
 	// check parameter file
 	if global.Args.ParameterFile != "" {
 		message := isFileValid(global.Args.ParameterFile, FILEMUSTEXIST)
@@ -148,6 +132,10 @@ func argsValid() bool {
 			fmt.Println("Parameter", message)
 			return false
 		}
+	}
+
+	if isDbBackupFunction(global.Args.Function) {
+		return dbBackupParametersValid(global.Args.Function)
 	}
 
 	// Check Userid
@@ -196,40 +184,8 @@ func argsValid() bool {
 }
 
 func dbBackupParametersValid(function string) bool {
-	if global.Args.EndpointUrl == "" {
-		fmt.Println(
-			"You must specify an valid URL for argument '-endpoint'.")
-		return false
-	}
-
-	if global.Args.Region == "" {
-		fmt.Println(
-			"You must specify an valid region for argument '-region'.")
-		return false
-	}
-
-	if global.Args.AuthMode == AUTH_APIKEY {
-		if isFileValid(global.Args.AuthKeypath, true) != "" {
-			fmt.Println("You must specify a valid path to the " +
-				"file containing your apikey.")
-			return false
-		}
-	}
-
-	if function == global.BUCKET_GET_LIFECYCLE ||
-		function == global.BUCKET_GET_LIST ||
-		function == global.BUCKET_VERIFY {
-		if global.Args.Bucket == "" {
-			fmt.Printf(
-				"For function '%s'"+
-					"the parameter '-bucket' must be specified.",
-				function,
-			)
-			return false
-		}
-	}
-	if function == global.BUCKET_GET_LIFECYCLE ||
-		function == global.BUCKET_GET_LIST {
+	switch function {
+	case global.BUCKET_GET_LIFECYCLE, global.BUCKET_GET_LIST:
 		if global.Args.ResultFile == "" {
 			fmt.Printf(
 				"For function '%s'"+
@@ -238,14 +194,12 @@ func dbBackupParametersValid(function string) bool {
 			)
 			return false
 		}
-
 		message := isFileValid(global.Args.ResultFile, FILEMUSTEXIST)
 		if message != "" {
 			fmt.Println("Parameter", message)
 			return false
 		}
-	}
-	if function == global.FILE_UPLOAD {
+	case global.FILE_UPLOAD:
 		if global.Args.Source == "" ||
 			global.Args.Key == "" {
 			fmt.Println(
@@ -254,7 +208,10 @@ func dbBackupParametersValid(function string) bool {
 			)
 			return false
 		}
+	default:
+		return true
 	}
+
 	return true
 }
 

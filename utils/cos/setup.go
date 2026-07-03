@@ -86,28 +86,12 @@ func setupCosConfig() *aws.Config {
 		global.FAILURE,
 	)
 
-	var apikey string
-	var region string
-	var endpoint string
-	var authEndpoint string
-	var authMethod string
-
-	if config.BackintConfig != nil {
-		apikey = config.BackintConfig.Apikey()
-		region = config.BackintConfig.Region()
-		endpoint = config.BackintConfig.EndpointUrl()
-		authEndpoint = config.BackintConfig.IBMAuthEndpoint()
-		authMethod = config.BackintConfig.AuthMode()
-
-	} else {
-		region = global.Args.Region
-		endpoint = global.Args.EndpointUrl
-		authEndpoint = global.Args.AuthEndpoint
-		authMethod = global.Args.AuthMode
-		if authMethod == config.AUTH_APIKEY {
-			apikey, _ = global.ReadApikeyFromFile(global.Args.AuthKeypath)
-		}
-	}
+	apikey := config.BackintConfig.Apikey()
+	region := config.BackintConfig.Region()
+	endpoint := config.BackintConfig.EndpointUrl()
+	authEndpoint := config.BackintConfig.IBMAuthEndpoint()
+	authMethod := config.BackintConfig.AuthMode()
+	iamProfileId := config.BackintConfig.IamProfileId()
 
 	var creds *credentials.Credentials
 
@@ -119,7 +103,7 @@ func setupCosConfig() *aws.Config {
 			"",
 		)
 	case config.AUTH_TRUSTEDPROFILE:
-		creds = newPowerVSCredentials()
+		creds = newPowerVSCredentials(iamProfileId)
 	default:
 		break
 	}

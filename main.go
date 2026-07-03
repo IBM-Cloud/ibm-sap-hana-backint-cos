@@ -52,6 +52,17 @@ func main() {
 
 	// Executing functions called by snappy agent and exit
 	if dbBackupFunction {
+		// Generating the configuration from the parameter file
+		// configuration settings and defaults.
+		config.BackintConfig, _ = config.GenerateConfiguration(
+			global.Args.ParameterFile,
+		)
+		if config.BackintConfig == nil {
+			// Error during generating/validating the configuration
+			fmt.Println("Error generating the configuration.")
+			os.Exit(global.WRONG_PARAMETER)
+		}
+
 		if !snappy.Execute(global.Args.Function) {
 			os.Exit(global.FAILURE)
 		}

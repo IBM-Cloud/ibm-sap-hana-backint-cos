@@ -1,3 +1,22 @@
+# 2.1.0 (July 4, 2026)
+
+## **New Features**
+
+### Added
+
+- **`iam_profile_id` configuration parameter** (`[cloud_storage]` section): optional parameter that allows specifying a non-default IAM Trusted Profile when `auth_mode = oauth`. When set, it overrides the default trusted profile attached to the PowerVS instance.
+
+### Changed
+
+- **`newPowerVSCredentials`** now accepts an `iamProfileId` string; when non-empty, `SetIAMProfileID` is called on the VPC instance authenticator builder so that the specified profile is used instead of the instance default.
+- **`validateSpecial`** now delegates auth-mode validation to a unified `validateAuthMode` function, replacing the previous separate `validateAuthKeypath` and `validateIBMAuthEndpoint` functions. Validation logic covers:
+  - `auth_mode = apikey`: `auth_keypath` must be set; `iam_profile_id` must not be set.
+  - `auth_mode = oauth`: `auth_keypath` must not be set.
+
+### Fixed
+
+- Bucket existence check errors (e.g. wrong IAM profile, `403 Forbidden`) are now logged at `ERROR` level instead of `DEBUG`, ensuring they are visible regardless of the configured log level.
+
 # 2.0.0 (June 30, 2026)
 
 ## **New Features**

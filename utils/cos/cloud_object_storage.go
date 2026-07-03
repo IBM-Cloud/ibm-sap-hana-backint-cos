@@ -155,7 +155,7 @@ func BucketExists(s3Client *s3.S3) bool {
 	}
 
 	if err != nil {
-		global.Logger.Debug(
+		global.Logger.Error(
 			fmt.Sprintf("Error during getting bucket information. %s", err),
 		)
 		os.Exit(global.FAILURE)

@@ -148,7 +148,9 @@ func validateKeysInSections(parms []ConfigParameter) []ConfigParameter {
 			"\nValidating classification of parameters",
 		)
 	}
-	for _, p := range parms {
+
+	for i := range parms {
+		p := &parms[i]
 		keyFromFile := p.key
 		sectionFromFile := p.section
 		found := false
@@ -257,58 +259,7 @@ lock retention belong to more than one parameter
 */
 func validateSpecial(basicConfig []Default) {
 	validateLockRetention(basicConfig)
-	validateAuthKeypath(basicConfig)
-	validateIBMAuthEndpoint(basicConfig)
-}
-
-/*
-Validates that ibm_auth_endpoint is not specified when auth_mode is oauth.
-It is only relevant for apikey mode.
-*/
-func validateIBMAuthEndpoint(basicConfig []Default) {
-	authMode := getObjForKey(basicConfig, "auth_mode")
-	if authMode.configValue == AUTH_TRUSTEDPROFILE {
-		endpoint := getObjForKey(basicConfig, "ibm_auth_endpoint")
-		if endpoint.configValue != "" {
-			message := fmt.Sprintf("%s: 'ibm_auth_endpoint' is not applicable"+
-				" when auth_mode is '%s'. Remove it from the configuration.",
-				VALIDATION_ERROR,
-				AUTH_TRUSTEDPROFILE,
-			)
-			if global.Args.CheckParms {
-				checkParmMessages = append(checkParmMessages, "\t"+message)
-			}
-			invalidValues = append(invalidValues, InvalidValue{
-				errorMessage: message,
-				invalidParm:  endpoint,
-			})
-		}
-	}
-}
-
-/*
-Validates that auth_keypath is provided when auth_mode is apikey
-*/
-func validateAuthKeypath(basicConfig []Default) {
-	authMode := getObjForKey(basicConfig, "auth_mode")
-	if authMode.configValue == AUTH_APIKEY {
-		keypath := getObjForKey(basicConfig, "auth_keypath")
-		if keypath.configValue == "" {
-			message := fmt.Sprintf("%s: You did not specify a value"+
-				" for the mandatory parameter 'auth_keypath'."+
-				" It is required when auth_mode is '%s'.",
-				VALIDATION_ERROR,
-				AUTH_APIKEY,
-			)
-			if global.Args.CheckParms {
-				checkParmMessages = append(checkParmMessages, "\t"+message)
-			}
-			invalidValues = append(invalidValues, InvalidValue{
-				errorMessage: message,
-				invalidParm:  keypath,
-			})
-		}
-	}
+	validateAuthMode(basicConfig)
 }
 
 /*
@@ -570,11 +521,57 @@ func validateLockRetention(basicConfig []Default) {
 		if isObjectLockRetentionPeriod(basicConfig) {
 			message := fmt.Sprintf("%s: You did not specify 'object_lock_retention_mode' "+
 				"or 'object_lock_retention_mode' is set to 'None', "+
-				"but 'object_lock_retention_period' is specified.\n",
+				"but 'object_lock_retention_period' is specified.",
 				VALIDATION_ERROR,
 			)
 			Default{}.addInvalidValueMsg(message)
 		}
+	}
+}
+
+/*
+	Special validation:
+
+Validation of authorization mode.
+If auth_mode = apikey, auth_keypath must be set and valid
+If iam_profile_id, or iam_profile_crn is set, auth_mode must be oauth
+*/
+func validateAuthMode(basicConfig []Default) {
+	authMode := strings.ToLower(getObjForKey(basicConfig, auth_mode.key).configValue)
+
+	switch authMode {
+	case AUTH_TRUSTEDPROFILE:
+		if isSetAuthKeypath(basicConfig) {
+			message := fmt.Sprintf("%s: You did not specify '%s' for 'auth_mode', "+
+				" but you did set 'auth_key_path'.",
+				VALIDATION_ERROR,
+				AUTH_APIKEY,
+			)
+			Default{}.addInvalidValueMsg(message)
+		}
+		return
+	case AUTH_APIKEY:
+		if isSetIamProfileId(basicConfig) {
+			message := fmt.Sprintf("%s: You did specify '%s', "+
+				" but 'auth_mode' is not set to '%s'.",
+				VALIDATION_ERROR,
+				iam_profile_id.key,
+				AUTH_TRUSTEDPROFILE,
+			)
+			Default{}.addInvalidValueMsg(message)
+		}
+
+		if !isSetAuthKeypath(basicConfig) {
+			message := fmt.Sprintf("%s: You did not specify 'auth_keypath', "+
+				"but 'auth_mode' is set to '%s'.",
+				VALIDATION_ERROR,
+				AUTH_APIKEY,
+			)
+			Default{}.addInvalidValueMsg(message)
+		}
+		return
+	default:
+		return
 	}
 }
 
@@ -584,6 +581,28 @@ returns true if config value is of type boolean
 func (cp Default) isBool() bool {
 	_, err := strconv.ParseBool(cp.configValue)
 	return err == nil
+}
+
+/*
+Returns true if auth_keypath is set
+*/
+func isSetAuthKeypath(basicConfig []Default) bool {
+	return isSet(basicConfig, auth_keypath.key)
+}
+
+/*
+Returns true uf metadata_service_url is set
+*/
+func isSetIamProfileId(basicConfig []Default) bool {
+	return isSet(basicConfig, iam_profile_id.key)
+}
+
+/*
+Checks if a parameter is set in config file
+*/
+func isSet(basicConfig []Default, key string) bool {
+	b := getObjForKey(basicConfig, key)
+	return b.configValue != ""
 }
 
 /*

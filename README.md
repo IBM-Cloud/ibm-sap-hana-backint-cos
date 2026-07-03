@@ -219,37 +219,38 @@ Place the configuration file in a directory accessible by SAP HANA, preferably:
 
 | Parameter            | Values                                                                                                                          | Required | Description                                                                                                                      |
 |----------------------|---------------------------------------------------------------------------------------------------------------------------------|----------|----------------------------------------------------------------------------------------------------------------------------------|
-| `auth_mode`          | `apikey`, `oauth`                                                                                                               | ✅ Yes   | Authentication method.<br>- `apikey`: Use IBM Cloud API key<br>- `oauth`: Use PowerVS instance metadata service via trusted IAM profile (automatic token refresh) |
-| `auth_keypath`       | `<file_path>`                                                                                                                   | ✅ Yes (for `apikey` mode only)<br>⬜ Not used (for `oauth` mode) | Full path to file containing IBM Cloud API key. Must not be set when `auth_mode=oauth`.                                         |
-| `bucket`             | `<bucket_name>`                                                                                                                 | ✅ Yes   | Name of IBM Cloud Object Storage bucket.                                                                                         |
-| `region`             | `au-syd`, `br-sao`, `ca-tor`, `eu-de`, `eu-es`, `eu-gb`, `in-che`, `in-mum`, `jp-osa`, `jp-tok`, `us-east`, `us-south`        | ✅ Yes   | Region of the COS bucket.                                                                                                        |
-| `endpoint_url`       | `<endpoint_url>`                                                                                                                | ✅ Yes   | Regional **direct** endpoint URL for the COS bucket (e.g., `https://s3.direct.us-south.cloud-object-storage.appdomain.cloud`).  |
-| `ibm_auth_endpoint`  | `https://private.iam.cloud.ibm.com/identity/token` or `https://iam.cloud.ibm.com/identity/token`                               | ⬜ No (`apikey` mode only) | IAM authentication endpoint. **Only applicable when `auth_mode=apikey`** — must not be set for `oauth` mode.<br>**Default**: `https://private.iam.cloud.ibm.com/identity/token` |
+| auth_mode         | `apikey`, `oauth`                                                                                                               | ✅ Yes   | Authentication method.<br>- `apikey`: Use IBM Cloud API key<br>- `oauth`: Use PowerVS instance metadata service via trusted IAM profile (automatic token refresh) |
+| auth_keypath       | `<file_path>`                                                                                                                   | ✅ Yes (`apikey` mode only)<br>⬜ Not used (`oauth` mode) | Full path to file containing IBM Cloud API key. Must not be set when `auth_mode=oauth`.                                         |
+| iam_profile_id  | `<IAM Profile Id>`                               | ⬜ No (`oauth` mode only) | IAM Profile Id. <br>**Only applicable when `auth_mode = oauth`** <br>- must not be set for `apikey` mode. When specified, overrides the default trusted profile attached to the PowerVS instance |
+| bucket             | `<bucket_name>`                                                                                                                 | ✅ Yes   | Name of IBM Cloud Object Storage bucket.                                                                                         |
+| region            | `au-syd`, `br-sao`, `ca-tor`, `eu-de`, `eu-es`, `eu-gb`, `in-che`, `in-mum`, `jp-osa`, `jp-tok`, `us-east`, `us-south`        | ✅ Yes   | Region of the COS bucket.                                                                                                        |
+| endpoint_url      | `<endpoint_url>`                                                                                                                | ✅ Yes   | Regional **direct** endpoint URL for the COS bucket (e.g., `https://s3.direct.us-south.cloud-object-storage.appdomain.cloud`).  |
+| ibm_auth_endpoint  | `https://private.iam.cloud.ibm.com/identity/token` or `https://iam.cloud.ibm.com/identity/token`                               | ⬜ No (`apikey` mode only) | IAM authentication endpoint. <br>**Only applicable when `auth_mode = apikey`** <br>- must not be set for `oauth` mode.<br>**Default**: `https://private.iam.cloud.ibm.com/identity/token` |
 
 #### [objects] Section (Optional)
 
 | Parameter                        | Values                    | Required | Description                                                                                                                                                |
 |----------------------------------|---------------------------|----------|------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `remove_key_prefix`              | `<prefix_string>`         | ⬜ No    | String to remove from the beginning of backup file paths when creating object keys.                                                                        |
-| `additional_key_prefix`          | `<prefix_string>`         | ⬜ No    | String to prepend to object keys (useful for organizing backups by database).                                                                              |
-| `object_tags`                    | `<Key1=Val1,Key2=Val2>`   | ⬜ No    | Tags to apply to COS objects (max 10 key-value pairs).                                                                                                     |
-| `object_lock_retention_mode`     | `None`, `cmp`, `gov`      | ⬜ No    | Object retention mode. `cmp` = COMPLIANCE mode. `gov` = GOVERNANCE mode. <br>**Default**: `None`                                                                                     |
-| `object_lock_retention_period`   | `<years,months,days>`     | ⬜ No    | Retention period as comma-separated integers (e.g., `1,6,15` for 1 year, 6 months, 15 days). All three values required, at least one must be > 0.          |
-| `object_lock_legal_hold_status`  | `ON`, `OFF`               | ⬜ No    | Legal hold prevents deletion until disabled.<br>**Default**: `OFF`                                                                                         |
+| remove_key_prefix             | `<prefix_string>`         | ⬜ No    | String to remove from the beginning of backup file paths when creating object keys.                                                                        |
+| additional_key_prefix          | `<prefix_string>`         | ⬜ No    | String to prepend to object keys (useful for organizing backups by database).                                                                              |
+| object_tags                    | `<Key1=Val1,Key2=Val2>`   | ⬜ No    | Tags to apply to COS objects (max 10 key-value pairs).                                                                                                     |
+| object_lock_retention_mode     | `None`, `cmp`, `gov`      | ⬜ No    | Object retention mode. `cmp` = COMPLIANCE mode. `gov` = GOVERNANCE mode. <br>**Default**: `None`                                                                                     |
+| object_lock_retention_period   | `<years,months,days>`     | ⬜ No    | Retention period as comma-separated integers (e.g., `1,6,15` for 1 year, 6 months, 15 days). All three values required, at least one must be > 0.          |
+| object_lock_legal_hold_status | `ON`, `OFF`               | ⬜ No    | Legal hold prevents deletion until disabled.<br>**Default**: `OFF`                                                                                         |
 
 #### [backint] Section (Optional)
 
 | Parameter                  | Values                     | Required | Description                                                                                                                                                  |
 |----------------------------|----------------------------|----------|--------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `max_concurrency`          | `<integer>`                | ⬜ No    | Number of concurrent upload threads per backup stream.<br>**Default**: `4`                                                                                   |
-| `recover_max_concurrency`  | `<integer>`                | ⬜ No    | Number of concurrent download threads during restore.<br>**Default**: `4`                                                                                    |
-| `multipart_chunksize`      | `<size>` or `<size><unit>` | ⬜ No    | Chunk size for multipart uploads. Units: `KB`, `MB`, `GB` (case-insensitive).<br>Examples: `134000000`, `100MB`, `1GB`.<br>**Default**: `134000000` (128 MB) |
+| max_concurrency          | `<integer>`                | ⬜ No    | Number of concurrent upload threads per backup stream.<br>**Default**: `4`                                                                                   |
+| recover_max_concurrency  | `<integer>`                | ⬜ No    | Number of concurrent download threads during restore.<br>**Default**: `4`                                                                                    |
+| multipart_chunksize      | `<size>` or `<size><unit>` | ⬜ No    | Chunk size for multipart uploads. Units: `KB`, `MB`, `GB` (case-insensitive).<br>Examples: `134000000`, `100MB`, `1GB`.<br>**Default**: `134000000` (128 MB) |
 
 #### [trace] Section (Optional)
 
 | Parameter          | Values                                                  | Required | Description                                     |
 |--------------------|---------------------------------------------------------|----------|-------------------------------------------------|
-| `agent_log_level`  | `debug`, `info`, `warning`, `error`, `critical`, `http` | ⬜ No    | Logging verbosity level.<br>**Default**: `info` |
+| agent_log_level  | `debug`, `info`, `warning`, `error`, `critical`, `http` | ⬜ No    | Logging verbosity level.<br>**Default**: `info` |
 
 ### Key Prefixes
 
