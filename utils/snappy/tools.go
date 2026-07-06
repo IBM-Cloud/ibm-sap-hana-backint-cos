@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/config"
 	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/cos"
 	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/global"
 
@@ -34,24 +35,24 @@ func Execute(function string) bool {
 	case global.BUCKET_GET_LIFECYCLE:
 		return getBucketLifeCycle(
 			s3Client,
-			global.Args.Bucket,
+			config.BackintConfig.BucketName(),
 			global.Args.ResultFile,
 		)
 	case global.BUCKET_GET_LIST:
 		return getObjectList(
 			s3Client,
-			global.Args.Bucket,
+			config.BackintConfig.BucketName(),
 			global.Args.ResultFile,
 		)
 	case global.BUCKET_VERIFY:
 		return verifyBucket(
 			s3Client,
-			global.Args.Bucket,
+			config.BackintConfig.BucketName(),
 		)
 	case global.FILE_UPLOAD:
 		return uploadFile(
 			s3Client,
-			global.Args.Bucket,
+			config.BackintConfig.BucketName(),
 			global.Args.Source,
 			global.Args.Key,
 		)
