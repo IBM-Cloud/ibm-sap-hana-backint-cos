@@ -1,5 +1,5 @@
-github.com/IBM/go-sdk-core/v5 v5.22.0 h1:ltv4MfXST/1kTtBTfioteRxedYZGcoNH/Zy3NF6jq1g=
-github.com/IBM/go-sdk-core/v5 v5.22.0/go.mod h1:cZJMMEImJkIXCd61kHeDFtjbdDpXq4ua4ITrwpBYdWs=
+github.com/IBM/go-sdk-core/v5 v5.22.1 h1:5eTGq4IFEMZnb7fRdk+oxQMFvj0cRAUJqdPxojpGtY8=
+github.com/IBM/go-sdk-core/v5 v5.22.1/go.mod h1:yO+OQpByKDLTvpEcsFFexgzpeR8eRfCFWAYzxkAu4bk=
 github.com/IBM/ibm-cos-sdk-go v1.14.1 h1:Qz122nd7m9F0GixhSNdL4OPSwhJKHR4NN/dmBPemflI=
 github.com/IBM/ibm-cos-sdk-go v1.14.1/go.mod h1:h2G89PVcjfG5Bae1Q6Sr60MrPSGjD7x9ivF6crkJivM=
 github.com/bigkevmcd/go-configparser v0.0.0-20251110123434-de62ed489b4f h1:Z+TCXWF3cef/kRSQLJtM1eSeDmvN08uRiesaTGh3fPk=
