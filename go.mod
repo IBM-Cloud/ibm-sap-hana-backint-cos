@@ -25,7 +25,7 @@ require (
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/oklog/ulid/v2 v2.1.1 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
-	golang.org/x/crypto v0.51.0 // indirect
+	golang.org/x/crypto v0.52.0 // indirect
 	golang.org/x/net v0.55.0 // indirect
 	golang.org/x/text v0.37.0 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
