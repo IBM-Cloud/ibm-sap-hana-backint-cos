@@ -7,7 +7,7 @@ require (
 	github.com/IBM/ibm-cos-sdk-go v1.14.1
 	github.com/bigkevmcd/go-configparser v0.0.0-20251110123434-de62ed489b4f
 	github.com/sirupsen/logrus v1.9.4
-	golang.org/x/sys v0.46.0
+	golang.org/x/sys v0.47.0
 )
 
 require (
