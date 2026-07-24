@@ -84,7 +84,7 @@ powerVSProvider wraps the initFunc and refreshes directly from the metadata serv
 every expiry — it never attempts the IAM refresh_token POST, which would always fail
 because PowerVS-sourced tokens carry no refresh token.
 */
-func newPowerVSCredentials(iamProfileId string) *credentials.Credentials {
+func newPowerVSCredentials(iamProfileId string, iamProfileName string) *credentials.Credentials {
 	authenticatorBuilder := core.NewVpcInstanceAuthenticatorBuilder().
 		SetURL(global.METADATA_SERVICE_URL).
 		SetServiceVersion(global.SERVICE_VERSION)
@@ -93,6 +93,9 @@ func newPowerVSCredentials(iamProfileId string) *credentials.Credentials {
 		authenticatorBuilder.SetIAMProfileID(iamProfileId)
 	}
 
+	if iamProfileName != "" {
+		authenticatorBuilder.SetIAMProfileName(iamProfileName)
+	}
 	authenticator, err := authenticatorBuilder.Build()
 
 	global.CheckForError(

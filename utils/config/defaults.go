@@ -49,6 +49,13 @@ var iam_profile_id = Default{
 	mandatory:      false,
 	validationType: CONFIG_STRING}
 
+var iam_profile_name = Default{
+	key:            "iam_profile_name",
+	section:        SECTION_CLOUD_STORAGE,
+	defaultValue:   "",
+	mandatory:      false,
+	validationType: CONFIG_STRING}
+
 var ibm_auth_endpoint = Default{
 	key:            "ibm_auth_endpoint",
 	section:        SECTION_CLOUD_STORAGE,
@@ -178,6 +185,7 @@ var configDefaults = []Default{
 	region,
 	endpoint_url,
 	iam_profile_id,
+	iam_profile_name,
 	ibm_auth_endpoint,
 	max_concurrency,
 	recover_max_concurrency,
