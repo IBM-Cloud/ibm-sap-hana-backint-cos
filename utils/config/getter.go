@@ -95,6 +95,13 @@ func (b BackintConfigT) IamProfileId() string {
 }
 
 /*
+Getting the IAM Profile Name
+*/
+func (b BackintConfigT) IamProfileName() string {
+	return b.Get(iam_profile_name.key)
+}
+
+/*
 Getting the IBM Authorization endpoint
 */
 func (b BackintConfigT) IBMAuthEndpoint() string {

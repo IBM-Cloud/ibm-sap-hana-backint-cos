@@ -1,3 +1,18 @@
+# 2.2.0 (July 23, 2026)
+
+## **New Features**
+
+### Added
+
+- **`iam_profile_name` configuration parameter** (`[cloud_storage]` section): optional parameter that allows specifying a non-default IAM Trusted Profile by **name** when `auth_mode = oauth`. When set, it overrides the default trusted profile attached to the PowerVS instance. Use either `iam_profile_id` or `iam_profile_name` — setting both is a validation error.
+
+### Changed
+
+- **`newPowerVSCredentials`** now accepts an `iamProfileName` string in addition to `iamProfileId`; when non-empty, `SetIAMProfileName` is called on the VPC instance authenticator builder.
+- **`validateAuthMode`** extended to reject configurations where both `iam_profile_id` and `iam_profile_name` are set simultaneously.
+
+---
+
 # 2.1.0 (July 4, 2026)
 
 ## **New Features**

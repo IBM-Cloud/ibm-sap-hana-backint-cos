@@ -505,7 +505,8 @@ func (cp Default) validateUrl() {
 }
 
 /*
-Special validation:
+	Special validation:
+
 Validating object lock retention
 */
 func validateLockRetention(basicConfig []Default) {
@@ -534,7 +535,7 @@ func validateLockRetention(basicConfig []Default) {
 
 Validation of authorization mode.
 If auth_mode = apikey, auth_keypath must be set and valid
-If iam_profile_id, or iam_profile_crn is set, auth_mode must be oauth
+If iam_profile_id, or iam_profile_name is set, auth_mode must be oauth
 */
 func validateAuthMode(basicConfig []Default) {
 	authMode := strings.ToLower(getObjForKey(basicConfig, auth_mode.key).configValue)
@@ -548,6 +549,17 @@ func validateAuthMode(basicConfig []Default) {
 				AUTH_APIKEY,
 			)
 			Default{}.addInvalidValueMsg(message)
+			return
+		}
+		if isSetIamProfileId(basicConfig) && isSetIamProfileName(basicConfig) {
+			message := fmt.Sprintf("%s: You did specify both '%s' and '%s', "+
+				" you must set either one of them.",
+				VALIDATION_ERROR,
+				iam_profile_id.key,
+				iam_profile_name.key,
+			)
+			Default{}.addInvalidValueMsg(message)
+			return
 		}
 		return
 	case AUTH_APIKEY:
@@ -591,10 +603,17 @@ func isSetAuthKeypath(basicConfig []Default) bool {
 }
 
 /*
-Returns true uf metadata_service_url is set
+Returns true if iam_profile_id is set
 */
 func isSetIamProfileId(basicConfig []Default) bool {
 	return isSet(basicConfig, iam_profile_id.key)
+}
+
+/*
+Returns true if iam_profile_name is set
+*/
+func isSetIamProfileName(basicConfig []Default) bool {
+	return isSet(basicConfig, iam_profile_name.key)
 }
 
 /*

@@ -17,5 +17,5 @@ package version
 // Versions
 const (
 	BACKINT_VERSION = "backint 1.04"
-	TOOL_VERSION    = "Backint for IBM Object Store version: '2.1.0'"
+	TOOL_VERSION    = "Backint for IBM Object Store version: '2.2.0'"
 )

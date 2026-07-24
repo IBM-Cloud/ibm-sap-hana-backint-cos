@@ -92,6 +92,7 @@ func setupCosConfig() *aws.Config {
 	authEndpoint := config.BackintConfig.IBMAuthEndpoint()
 	authMethod := config.BackintConfig.AuthMode()
 	iamProfileId := config.BackintConfig.IamProfileId()
+	iamProfileName := config.BackintConfig.IamProfileName()
 
 	var creds *credentials.Credentials
 
@@ -103,7 +104,7 @@ func setupCosConfig() *aws.Config {
 			"",
 		)
 	case config.AUTH_TRUSTEDPROFILE:
-		creds = newPowerVSCredentials(iamProfileId)
+		creds = newPowerVSCredentials(iamProfileId, iamProfileName) // pragma: allowlist secret
 	default:
 		break
 	}
