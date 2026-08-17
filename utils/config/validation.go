@@ -307,7 +307,7 @@ func (cp Default) validateBool() {
 Validating chunksize value
 */
 func (cp Default) validateChunksize() {
-	errMsg := "The value you specified does not have to correct format." +
+	errMsg := "The value you specified does not have the correct format." +
 		" It must be either an integer value or must have the format: " +
 		" <size><unit> while <unit> must be either 'KB', 'MB', or 'GB' and " +
 		" <size> must not be 0 or undefined."
@@ -321,7 +321,7 @@ func (cp Default) validateChunksize() {
 
 	// Splitting value in size and unit
 	// Format: <size><unit> while unit is
-	// KB, MB or GB (case unsensitive)
+	// KB, MB or GB (case insensitive)
 	if len(cp.configValue) < 3 {
 		cp.addInvalidValueMsg(errMsg)
 		return

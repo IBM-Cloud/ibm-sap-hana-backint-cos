@@ -41,13 +41,6 @@ func ToString(val int64) string {
 }
 
 /*
-Compress TODO -> Issue #7
-*/
-// func Compress(src []byte) []byte {
-// 	return encoder.EncodeAll(src, make([]byte, 0, len(src)))
-// }
-
-/*
 Check error and set OS Exit code
 */
 func CheckForError(err error, message string, rc int) {

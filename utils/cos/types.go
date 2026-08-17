@@ -14,13 +14,9 @@
 
 package cos
 
-import (
-	"io"
-	"os"
-	"time"
-)
+import "time"
 
-// Datatype representing the HTTP settings
+// HTTPClientSettings holds the timeouts and pool sizes for the HTTP client.
 type HTTPClientSettings struct {
 	Connect          time.Duration
 	ConnKeepAlive    time.Duration
@@ -33,7 +29,7 @@ type HTTPClientSettings struct {
 	MaxConnsPerHost  int
 }
 
-// Datatype representing the result for one Cloud Object Storage action (Upload/Download/Delete)
+// Result represents the outcome of one Cloud Object Storage action (Upload/Download/Delete).
 type Result struct {
 	Err        error
 	Duration   float64
@@ -44,7 +40,7 @@ type Result struct {
 	ETag       string
 }
 
-// Datatype representing information of one IBM Cloud Object Storage Object
+// CosObject holds the information about one IBM Cloud Object Storage object.
 type CosObject struct {
 	ETag        string
 	Key         string
@@ -52,37 +48,4 @@ type CosObject struct {
 	Found       bool
 	Status      string
 	NextIndex   *int64
-}
-
-// Datatype representing the information of one part for downloading an object
-type DownloadPart struct {
-	Key        string
-	numParts   int64
-	partNumber int64
-	byteRange  string
-}
-
-// Datatype representing the result of downloading one part of an object
-type DownloadPartResult struct {
-	partNumber int64
-	size       int64
-	err        error
-}
-
-// Datatype representing the parameters for the runDownloadSinglePart call
-type DownloadSingePart struct {
-	fifo               *os.File
-	partsNotYetWritten ByteMap
-	downloadPart       DownloadPart
-	nextIndex          *int64
-	pipeBufferSize     int
-}
-
-// Representation for easier handling of a Bytemap
-type ByteMap map[int64][]byte
-
-// Type for reading from pipe directly to upload data
-type backintReader struct {
-	r         io.Reader
-	noOfbytes int64
 }

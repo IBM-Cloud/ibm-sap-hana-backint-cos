@@ -83,7 +83,6 @@ const (
 
 // File validation values
 const (
-	FILEOK          = 0
 	FILENOTFOUND    = 1
 	FILENOTREADABLE = 2
 

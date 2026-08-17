@@ -1,3 +1,15 @@
+# 2.3.0 (August 17, 2026)
+
+## **New Features**
+
+### Added
+
+- **Named pipe upload** — `utils/cos.cloud_object_storage.go` now calls `uploader.UploadWithPipe` (IBM COS SDK) instead of the previous file-based upload path. Backup data is streamed from the named pipe (`sourcePath`) directly to COS as a multipart upload
+
+- **Named pipe download** — `utils/cos.cloud_object_storage.go` now calls `downloader.DownloadWithPipe` (IBM COS SDK) instead of the previous sequential download path.
+
+---
+
 # 2.2.0 (July 23, 2026)
 
 ## **New Features**
