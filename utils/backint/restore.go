@@ -43,24 +43,32 @@ func Restore(
 	var wgDownload sync.WaitGroup
 	chanDownload := make(chan cos.Result, len(cosObjects))
 
-	// Running all downloads asynchronously
+	// Running all downloads asynchronously.
+	// wgDownload is incremented before launching each goroutine so that
+	// wgDownload.Wait() correctly blocks until every download finishes,
+	// regardless of whether the ETag was already known or had to be looked up.
 	for n, element := range cosObjects {
-		if element.ETag == "" {
-			etag := cos.GetETagOfLatestVersionForKey(s3Client, element.Key)
-			if etag == "" {
-				chanDownload <- setObjectNotFoundResult(element)
-				continue
-			}
-			element.ETag = etag
-			wgDownload.Add(1)
-		}
-		logMessage := fmt.Sprintf(
-			"Restoring backup '%s' with '%s' in process #%d",
-			element.Key, element.ETag, n,
-		)
-		global.Logger.Info(logMessage)
+		wgDownload.Add(1)
+		go func(n int, element cos.CosObject) {
+			defer wgDownload.Done()
 
-		go runDownload(s3Client, &wgDownload, element, chanDownload)
+			if element.ETag == "" {
+				etag := cos.GetETagOfLatestVersionForKey(s3Client, element.Key)
+				if etag == "" {
+					chanDownload <- setObjectNotFoundResult(element)
+					return
+				}
+				element.ETag = etag
+			}
+
+			global.Logger.Info(fmt.Sprintf(
+				"Restoring backup '%s' with '%s' in process #%d",
+				element.Key, element.ETag, n,
+			))
+
+			restoreResult := cos.Download(s3Client, element)
+			chanDownload <- restoreResult
+		}(n, element)
 	}
 	wgDownload.Wait()
 	close(chanDownload)
@@ -69,21 +77,6 @@ func Restore(
 
 	// Checking the results of the single object downloads and return
 	return restoreResultHandler(chanDownload)
-}
-
-/*
-Executing download of a single object from
-IBM Cloud Object Storage asynchronously
-*/
-func runDownload(
-	s3Client *s3.S3,
-	wg *sync.WaitGroup,
-	element cos.CosObject,
-	chanDownload chan cos.Result,
-) {
-	defer wg.Done()
-	restoreResult := cos.Download(s3Client, element)
-	chanDownload <- restoreResult
 }
 
 /*

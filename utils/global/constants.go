@@ -16,11 +16,10 @@ package global
 
 // Function names
 const (
-	BACKUP        = "BACKUP"
-	DELETE        = "DELETE"
-	INQUIRE       = "INQUIRE"
-	RESTORE       = "RESTORE"
-	INTERNAL_TEST = "TEST"
+	BACKUP  = "BACKUP"
+	DELETE  = "DELETE"
+	INQUIRE = "INQUIRE"
+	RESTORE = "RESTORE"
 
 	// Functions used for calls from dbbackup tool
 	BUCKET_VERIFY        = "BUCKET-VERIFY"
@@ -34,7 +33,6 @@ var FUNCTIONLIST = []string{
 	DELETE,
 	INQUIRE,
 	RESTORE,
-	INTERNAL_TEST,
 	BUCKET_VERIFY,
 	BUCKET_GET_LIST,
 	BUCKET_GET_LIFECYCLE,
@@ -66,10 +64,6 @@ var OBJECTLOCKMODES = map[string]string{
 	LOCKMODE_CMP: "COMPLIANCE",
 	LOCKMODE_GOV: "GOVERNANCE",
 }
-
-// Default pipe buffer size used for recovery in case
-// the system call to get the buffer size produces an error
-const PIPE_BUFFER_SIZE = 1024 * 1024 * 1024
 
 // PowerVS metadata service constants
 const (

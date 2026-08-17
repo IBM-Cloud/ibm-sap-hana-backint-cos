@@ -169,17 +169,30 @@ func NewHTTPClientWithSettings(httpSettings HTTPClientSettings) (*http.Client, e
 }
 
 /*
-Setting the logging of HTTP requests in case of loglevel = DEBUG
+Setting the logging of HTTP requests and SDK internals based on the configured log level.
+- HTTP:  full AWS request/response wire logging + retries + errors + SDK debug messages
+- DEBUG: SDK debug messages only (pipe upload/download progress, retry attempts)
 */
 func setupCosLogging(cfg *aws.Config) *aws.Config {
-	if config.BackintConfig.AgentLogLevelU() == "HTTP" {
-		awsLogger := aws.LoggerFunc(func(args ...any) {
-			logrus.WithField("time", time.Now().Format(time.RFC850)).Info(args...)
-			logrus.SetOutput(logging.GetLogFile())
-		})
-		cfg = cfg.WithLogger(awsLogger)
+	level := config.BackintConfig.AgentLogLevelU()
+	if level != "HTTP" && level != "DEBUG" {
+		return cfg
+	}
+
+	awsLogger := aws.LoggerFunc(func(args ...any) {
+		logrus.WithField("time", time.Now().Format(time.RFC850)).Info(args...)
+		logrus.SetOutput(logging.GetLogFile())
+	})
+	cfg = cfg.WithLogger(awsLogger)
+
+	if level == "HTTP" {
 		cfg = cfg.WithLogLevel(
-			aws.LogDebugWithRequestErrors | aws.LogDebugWithRequestRetries,
+			aws.LogDebug | aws.LogDebugWithRequestErrors | aws.LogDebugWithRequestRetries,
+		)
+	} else {
+		// DEBUG: pipe-level messages only, no full HTTP wire logging
+		cfg = cfg.WithLogLevel(
+			aws.LogDebug | aws.LogDebugWithRequestRetries,
 		)
 	}
 	return cfg
