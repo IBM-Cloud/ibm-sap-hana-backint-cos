@@ -317,15 +317,23 @@ func Download(s3Client *s3.S3, element CosObject) Result {
 	// for large restores and causes "pipe write timeout" errors near completion.
 	pipeTimeoutSecs := int64(300)
 
+	getInput := &s3.GetObjectInput{
+		Bucket: aws.String(config.BackintConfig.BucketName()),
+		Key:    aws.String(element.Key),
+	}
+	// Pin the exact COS version when one is known.  Without this, a versioned
+	// bucket may serve a delete marker or a newer version instead of the backup
+	// object that HANA expects, causing "received 0 bytes" errors on restore.
+	if element.VersionId != "" {
+		getInput.VersionId = aws.String(element.VersionId)
+	}
+
 	n, err := downloader.DownloadWithPipe(
 		aws.BackgroundContext(),
 		&s3manager.DownloadPipeInput{
-			PipePath:    aws.String(element.Destination),
-			PipeTimeout: &pipeTimeoutSecs,
-			GetObjectInput: &s3.GetObjectInput{
-				Bucket: aws.String(config.BackintConfig.BucketName()),
-				Key:    aws.String(element.Key),
-			},
+			PipePath:       aws.String(element.Destination),
+			PipeTimeout:    &pipeTimeoutSecs,
+			GetObjectInput: getInput,
 		},
 	)
 
@@ -410,9 +418,10 @@ func BackupExists(s3Client *s3.S3, ETag string) bool {
 }
 
 /*
-Getting the ETag of the latest version of a given object
+Getting the ETag and VersionId of the latest version of a given object.
+Both values are returned so that callers can pin the exact COS version on download.
 */
-func GetETagOfLatestVersionForKey(s3Client *s3.S3, Key string) string {
+func GetETagOfLatestVersionForKey(s3Client *s3.S3, Key string) (string, string) {
 	global.Logger.Info(fmt.Sprintf("Getting latest version for '%s'.", Key))
 
 	objectVersions := listObjectVersions(s3Client, Key, "")
@@ -420,16 +429,37 @@ func GetETagOfLatestVersionForKey(s3Client *s3.S3, Key string) string {
 	for _, v := range objectVersions {
 		if *v.Key == Key && *v.IsLatest {
 			ETag := strings.ReplaceAll(*v.ETag, "\"", "")
+			versionId := aws.StringValue(v.VersionId)
 			global.Logger.Info(
 				fmt.Sprintf("Latest version for key '%s' has entity tag '%s'.",
 					Key,
 					ETag,
 				),
 			)
-			return ETag
+			return ETag, versionId
 		}
 	}
 	global.Logger.Info(fmt.Sprintf("No version found for key '%s'.", Key))
+	return "", ""
+}
+
+/*
+GetVersionIdForETag returns the COS VersionId whose ETag matches the given
+value.  This is used on the EBID restore path, where HANA already supplies the
+ETag but the VersionId must still be resolved so that Download can pin the
+exact object version on a versioned bucket.  Returns an empty string when no
+matching version is found.
+*/
+func GetVersionIdForETag(s3Client *s3.S3, Key string, targetETag string) string {
+	objectVersions := listObjectVersions(s3Client, Key, "")
+	for _, v := range objectVersions {
+		if *v.Key == Key && strings.ReplaceAll(*v.ETag, "\"", "") == targetETag {
+			return aws.StringValue(v.VersionId)
+		}
+	}
+	global.Logger.Info(fmt.Sprintf(
+		"No version found for key '%s' with ETag '%s'.", Key, targetETag,
+	))
 	return ""
 }
 

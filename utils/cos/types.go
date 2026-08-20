@@ -44,6 +44,7 @@ type Result struct {
 type CosObject struct {
 	ETag        string
 	Key         string
+	VersionId   string // COS version ID corresponding to ETag; used to pin the exact version on download
 	Destination string
 	Found       bool
 	Status      string

@@ -52,13 +52,24 @@ func Restore(
 		go func(n int, element cos.CosObject) {
 			defer wgDownload.Done()
 
+			// Resolve ETag and VersionId so Download can pin the exact COS
+			// version.  On a versioned bucket, issuing GetObject without a
+			// VersionId returns whatever the current latest version is — which
+			// may be a delete marker or a newer object — causing HANA to see
+			// "received 0 bytes" errors on PIT recovery.
 			if element.ETag == "" {
-				etag := cos.GetETagOfLatestVersionForKey(s3Client, element.Key)
+				// NULL path: ETag not supplied by HANA — look up both.
+				etag, versionId := cos.GetETagOfLatestVersionForKey(s3Client, element.Key)
 				if etag == "" {
 					chanDownload <- setObjectNotFoundResult(element)
 					return
 				}
 				element.ETag = etag
+				element.VersionId = versionId
+			} else if element.VersionId == "" {
+				// EBID path: ETag known but VersionId not yet resolved.
+				// Resolve so the download is pinned to the correct version.
+				element.VersionId = cos.GetVersionIdForETag(s3Client, element.Key, element.ETag)
 			}
 
 			global.Logger.Info(fmt.Sprintf(
