@@ -6,7 +6,7 @@ require (
 	github.com/IBM/go-sdk-core/v5 v5.23.2
 	github.com/IBM/ibm-cos-sdk-go v1.15.0
 	github.com/bigkevmcd/go-configparser v0.0.0-20251110123434-de62ed489b4f
-	github.com/sirupsen/logrus v1.9.4
+	github.com/sirupsen/logrus v1.10.0
 )
 
 require (
