@@ -1,3 +1,18 @@
+# 2.3.1 (August 19, 2026)
+
+## **Bug Fixes**
+
+* **Fixed PIT recovery failing with "received 0 bytes" on versioned buckets**
+  On a versioned COS bucket, `GetObject` requests issued without a `VersionId` return whatever the current latest version of the key is. If that latest version is a delete marker or a newer object (e.g. created by lifecycle rules or object-lock expiry), COS returns an empty body and HANA reports `Expected to read 4096, but received 0 bytes`.
+  Full backup recoveries (`RECOVER DATA USING BACKINT`) were unaffected because the `NULL` input path already resolves the correct version via `GetETagOfLatestVersionForKey`. Point-in-time recoveries (`RECOVER DATABASE UNTIL TIMESTAMP`) use the `EBID` input path, where HANA supplies the ETag directly — the `VersionId` was never resolved, so `GetObject` could silently serve the wrong version.
+
+  The restore path now always resolves and pins the COS `VersionId` before issuing `GetObject`:
+  * `NULL` path (ETag not known): `GetETagOfLatestVersionForKey` now returns both the ETag and the `VersionId` of the latest version.
+  * `EBID` path (ETag already supplied by HANA): a new `GetVersionIdForETag` function scans the object's version list to find the `VersionId` matching the supplied ETag.
+  * `Download` sets `VersionId` on `GetObjectInput` whenever one is available, ensuring the correct object version is always retrieved.
+
+---
+
 # 2.3.0 (August 17, 2026)
 
 ## **New Features**
