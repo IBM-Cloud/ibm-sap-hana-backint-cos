@@ -16,6 +16,7 @@ package logging
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/global"
 	"github.com/ibm-cloud/ibm-sap-hana-backint-cos/utils/version"
@@ -49,9 +50,14 @@ func (b BackintResultMessages) Dump() {
 Adding a message with a keyword
 */
 func (b *BackintResultMessages) AddKeyword(keyword string, parms []string) {
-	message := fmt.Sprintf("#%s ", keyword)
+	message := fmt.Sprintf("#%s", keyword)
 	for _, a := range parms {
-		message = message + fmt.Sprintf("\"%s\" ", a)
+		aEscaped := strings.ReplaceAll(a, `"`, `\"`)
+		if strings.Contains(a, " ") || strings.Contains(a, `"`) {
+			message = message + fmt.Sprintf(" \"%s\"", aEscaped)
+		} else {
+			message = message + fmt.Sprintf(" %s", aEscaped)
+		}
 	}
 	*b = append(*b, message)
 }

@@ -341,7 +341,7 @@ func Download(s3Client *s3.S3, element CosObject) Result {
 			Duration:   duration,
 			Key:        element.Key,
 			ETag:       element.ETag,
-			SourcePath: element.Destination,
+			SourcePath: element.SourcePath,
 		}
 	}
 
@@ -355,7 +355,7 @@ func Download(s3Client *s3.S3, element CosObject) Result {
 		Duration:   duration,
 		Key:        element.Key,
 		ETag:       element.ETag,
-		SourcePath: element.Destination,
+		SourcePath: element.SourcePath,
 		// SourceSize == TargetSize == n: on a successful download every byte of
 		// the COS object has been written to the pipe, so n equals ContentLength.
 		// A separate HeadObject call to retrieve ContentLength independently

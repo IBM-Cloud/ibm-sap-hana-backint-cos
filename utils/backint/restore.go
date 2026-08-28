@@ -118,7 +118,7 @@ func setObjectNotFoundResult(element cos.CosObject) cos.Result {
 		Duration:   0,
 		SourceSize: 0,
 		TargetSize: 0,
-		SourcePath: element.Destination,
+		SourcePath: element.SourcePath,
 		Key:        element.Key,
 		ETag:       "",
 	}

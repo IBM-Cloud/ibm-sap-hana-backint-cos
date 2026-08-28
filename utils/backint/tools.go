@@ -128,6 +128,7 @@ func getCosObjectsForRestore() []cos.CosObject {
 		cosObject := cos.CosObject{
 			ETag:        etag,
 			Key:         Key,
+			SourcePath:  sourcePath,
 			Destination: destination,
 			Found:       false,
 			NextIndex:   &nextIndex,
