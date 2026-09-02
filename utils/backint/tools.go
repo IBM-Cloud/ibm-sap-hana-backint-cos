@@ -77,9 +77,13 @@ func getCosObjectsForDelete(
 		}
 
 		for _, cos_element := range cos.ListObjectsOfBucket(s3Client) {
-			if cos_element.ETag == &ETag && cos_element.Key == &Key {
-				cos_object.Found = true
-				break
+			if cos_element.ETag != nil && cos_element.Key != nil {
+				cleanCosElementETag := strings.ReplaceAll(*cos_element.ETag, "\"", "")
+				cleanETag := strings.ReplaceAll(ETag, "\"", "")
+				if cleanCosElementETag == cleanETag && *cos_element.Key == Key {
+					cos_object.Found = true
+					break
+				}
 			}
 		}
 		cosObjects = append(cosObjects, cos_object)
@@ -128,6 +132,7 @@ func getCosObjectsForRestore() []cos.CosObject {
 		cosObject := cos.CosObject{
 			ETag:        etag,
 			Key:         Key,
+			SourcePath:  sourcePath,
 			Destination: destination,
 			Found:       false,
 			NextIndex:   &nextIndex,

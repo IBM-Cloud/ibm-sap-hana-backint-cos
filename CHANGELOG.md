@@ -1,3 +1,17 @@
+# 2.3.1 (August 31, 2026)
+
+## **Bug Fixes**
+
+### Fixed
+
+- **Preserve Source Path for RESTORE Operations (Fixes `hdbbackupdiag` failure)** — Resolved an issue where the recovery catalog diagnostics tool `hdbbackupdiag --useBackintForCatalog` failed with error `[110512] Backint reported 'BACKINT recovery job into ... was not found in output'`. When a separate destination path was provided (e.g. into a temporary diagnostics directory), the tool incorrectly reported results back to SAP HANA using the temporary destination path instead of the original source path. Mapped the original source path to a new `SourcePath` field in `CosObject` and returned it on both successful and failed download results, as required by the SAP HANA Backint specification.
+
+- **Fixed Backup Inquiry (`hdbbackupdiag` availability check failure)** — Resolved a critical pointer-comparison bug where checking the existence of a backup during an inquiry (using `#EBID`) or a deletion check always reported the backup as `NOTFOUND`. The implementation was comparing raw pointer addresses (`element.ETag == &ETag` and `cos_element.ETag == &ETag`) rather than dereferenced string values, which always evaluated to `false`. Fixed by properly dereferencing pointers, and stripping any outer double-quotes from S3/COS entity tags during the comparison to ensure a reliable match.
+
+- **Aligned Backint Output formatting with Backint Specification** — Standardized output protocol message parameters to only be wrapped in double quotes when they contain space or quote characters (instead of unconditionally quoting all parameters), and removed trailing spaces from output lines. This resolves potential parsing issues with strict Backint output parsers.
+
+---
+
 # 2.3.0 (August 17, 2026)
 
 ## **New Features**

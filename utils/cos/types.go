@@ -44,6 +44,7 @@ type Result struct {
 type CosObject struct {
 	ETag        string
 	Key         string
+	SourcePath  string
 	Destination string
 	Found       bool
 	Status      string
