@@ -1,3 +1,19 @@
+# 2.3.2 (September 24, 2026)
+
+## **Bug Fixes & Enhancements**
+
+### Fixed
+
+- **Strip Backslashes and Quotes from ETags (Fixes `hdbbackupdiag` availability check fail)** — Resolved a critical issue where backups (specifically log backups) were reported as `not found` by `hdbbackupdiag --check` with errors like `ERROR: Backup ... ebid '\283d0b15935c781167d7738832139a5b\' not found` even though the files existed in the COS bucket. This was caused by the Go agent returning raw ETags (with double quotes) which resulted in escaped backslashes in SAP HANA's backup catalog. Fixed by aggressively stripping both outer double-quotes (`"`) and backslashes (`\`) from ETags in both check comparisons (e.g. `BackupExists` and delete checks) and written output keywords (e.g. `SAVED`, `RESTORED`, and `BACKUP`).
+
+- **Ignore `#TOOLOPTION` during RESTORE Operations (Fixes PIT Recovery & `hdbbackupdiag` Failures)** — Resolved a critical issue where both Point-in-Time (PIT) recovery and `hdbbackupdiag` verification failed early with errors `[110083]`, `[110514]`, `[110507]`, and `[110202]`. When SAP HANA includes `#TOOLOPTION` at the beginning of the restore input file, the agent aborted immediately and exited with code `1` before establishing any connection or writing back format-compliant responses (like `#NOTFOUND`). Added support to safely ignore the `#TOOLOPTION` keyword during restore parsing, aligning behavior with the inquiry parser.
+
+### Changed
+
+- **Remove Hardcoded S3 Region Restrictions** — Converted the `region` validation type from `CONFIG_LIST` (matching against a hardcoded list of known regions) to `CONFIG_STRING`. This ensures that when a new IBM Cloud Data Center (DC) is provisioned, users can deploy the agent to the new region immediately without requiring a new agent release just to white-list the new region.
+
+---
+
 # 2.3.1 (August 31, 2026)
 
 ## **Bug Fixes**

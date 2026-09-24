@@ -64,23 +64,10 @@ var ibm_auth_endpoint = Default{
 	validationType: CONFIG_URL}
 
 var region = Default{
-	key:     "region",
-	section: SECTION_CLOUD_STORAGE,
-	possibleValues: []string{
-		"au-syd",
-		"br-sao",
-		"ca-tor",
-		"eu-de",
-		"eu-es",
-		"eu-gb",
-		"in-che",
-		"in-mum",
-		"jp-osa",
-		"jp-tok",
-		"us-east",
-		"us-south"},
+	key:            "region",
+	section:        SECTION_CLOUD_STORAGE,
 	mandatory:      true,
-	validationType: CONFIG_LIST}
+	validationType: CONFIG_STRING}
 
 /*
 backint Section
