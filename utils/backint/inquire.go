@@ -52,16 +52,20 @@ func Inquire(
 				if Key != "" {
 					if *element.Key == Key {
 						found = true
+						cleanETag := strings.ReplaceAll(*element.ETag, "\"", "")
+						cleanETag = strings.ReplaceAll(cleanETag, "\\", "")
 						logging.BackintResultMsgs.AddKeyword(
 							"BACKUP",
-							[]string{*element.ETag, *element.Key},
+							[]string{cleanETag, *element.Key},
 						)
 					}
 				} else {
 					found = true
+					cleanETag := strings.ReplaceAll(*element.ETag, "\"", "")
+					cleanETag = strings.ReplaceAll(cleanETag, "\\", "")
 					logging.BackintResultMsgs.AddKeyword(
 						"BACKUP",
-						[]string{*element.ETag},
+						[]string{cleanETag},
 					)
 				}
 			}
@@ -86,14 +90,18 @@ func Inquire(
 				ETag := splitted[0]
 				Key := splitted[1]
 				if cos.BackupExists(s3Client, ETag) {
+					cleanETag := strings.ReplaceAll(ETag, "\"", "")
+					cleanETag = strings.ReplaceAll(cleanETag, "\\", "")
 					logging.BackintResultMsgs.AddKeyword(
 						"BACKUP",
-						[]string{ETag, Key},
+						[]string{cleanETag, Key},
 					)
 				} else {
+					cleanETag := strings.ReplaceAll(ETag, "\"", "")
+					cleanETag = strings.ReplaceAll(cleanETag, "\\", "")
 					logging.BackintResultMsgs.AddKeyword(
 						"NOTFOUND",
-						[]string{ETag, Key},
+						[]string{cleanETag, Key},
 					)
 				}
 			}

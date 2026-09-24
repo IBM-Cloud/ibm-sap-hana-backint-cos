@@ -79,8 +79,10 @@ func (b *BackintResultMessages) AddBackupSuccessMessage(
 	sourcePath string,
 	sourceSize int64,
 ) {
+	cleanETag := strings.ReplaceAll(ETag, "\"", "")
+	cleanETag = strings.ReplaceAll(cleanETag, "\\", "")
 	keyword := "SAVED"
-	parms := []string{ETag, sourcePath, global.ToString(sourceSize)}
+	parms := []string{cleanETag, sourcePath, global.ToString(sourceSize)}
 	b.AddKeyword(keyword, parms)
 }
 
@@ -119,8 +121,10 @@ func (b *BackintResultMessages) AddRestoreSuccessMessage(
 	ETag string,
 	sourcePath string,
 ) {
+	cleanETag := strings.ReplaceAll(ETag, "\"", "")
+	cleanETag = strings.ReplaceAll(cleanETag, "\\", "")
 	keyword := "RESTORED"
-	parms := []string{ETag, sourcePath}
+	parms := []string{cleanETag, sourcePath}
 	b.AddKeyword(keyword, parms)
 }
 

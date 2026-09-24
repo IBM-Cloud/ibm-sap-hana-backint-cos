@@ -401,10 +401,12 @@ Checking if a specific object exists
 */
 func BackupExists(s3Client *s3.S3, ETag string) bool {
 	cleanETag := strings.ReplaceAll(ETag, "\"", "")
+	cleanETag = strings.ReplaceAll(cleanETag, "\\", "")
 	cosObjectList := ListObjectsOfBucket(s3Client)
 	for _, element := range cosObjectList {
 		if element.ETag != nil {
 			cleanElementETag := strings.ReplaceAll(*element.ETag, "\"", "")
+			cleanElementETag = strings.ReplaceAll(cleanElementETag, "\\", "")
 			if cleanElementETag == cleanETag {
 				return true
 			}
