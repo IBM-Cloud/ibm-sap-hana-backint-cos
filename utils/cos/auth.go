@@ -115,9 +115,28 @@ func newPowerVSCredentials(iamProfileId string, iamProfileName string) *credenti
 // Authorization header correctly.
 func newPowerVSInitFunc(authenticator *core.VpcInstanceAuthenticator) func() (*iamtoken.Token, error) {
 	return func() (*iamtoken.Token, error) {
-		tokenValue, err := authenticator.GetToken()
+		var tokenValue string
+		var err error
+
+		maxAttempts := 3
+		for attempt := 1; attempt <= maxAttempts; attempt++ {
+			tokenValue, err = authenticator.GetToken()
+			if err == nil {
+				break
+			}
+
+			global.Logger.Warning(fmt.Sprintf(
+				"PowerVS IAM token fetch attempt %d of %d failed: %s. Retrying in 5 seconds...",
+				attempt, maxAttempts, err,
+			))
+
+			if attempt < maxAttempts {
+				time.Sleep(5 * time.Second)
+			}
+		}
+
 		if err != nil {
-			return nil, fmt.Errorf("failed to get PowerVS IAM token: %w", err)
+			return nil, fmt.Errorf("failed to get PowerVS IAM token after %d attempts: %w", maxAttempts, err)
 		}
 
 		var expiresIn int64 = 3600 // safe fallback: 1 hour

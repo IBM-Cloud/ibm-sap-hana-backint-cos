@@ -1,3 +1,13 @@
+# 2.3.3 (September 30, 2026)
+
+## **Bug Fixes & Enhancements**
+
+### Fixed
+
+- **Retry PowerVS IAM Token Retrieval on Metadata Service Congestion (Fixes Intermittent Timeout Failures)** — Resolved an issue where high network/CPU I/O during heavy S3 traffic caused requests to the local PowerVS Metadata Service (`api.metadata.power-iaas.cloud.ibm.com`) to occasionally exceed the 30-second connection timeout, resulting in intermittent `context deadline exceeded` errors. Implemented a robust 3-attempt exponential backoff retry mechanism with a 2-second sleep delay for all IAM token retrieval calls, ensuring highly resilient authentication on busy hosts.
+
+---
+
 # 2.3.2 (September 24, 2026)
 
 ## **Bug Fixes & Enhancements**
