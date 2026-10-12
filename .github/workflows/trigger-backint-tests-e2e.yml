@@ -26,27 +26,40 @@ jobs:
         github.event_name == 'issue_comment'
         && github.event.issue.pull_request
         && contains(github.event.comment.body, '/run-e2e')
+        && contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'),
+                    github.event.comment.author_association)
       )
 
     steps:
       - name: Resolve PR details
         id: pr-details
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN:  ${{ secrets.GITHUB_TOKEN }}
+          # Safe indirection: user-controlled values are bound to env vars and
+          # never interpolated directly into the shell script, which prevents
+          # command injection via PR title or branch name (CWE-78).
+          EVENT_NAME:    ${{ github.event_name }}
+          PR_NUMBER_CTX: ${{ github.event.pull_request.number }}
+          PR_SHA_CTX:    ${{ github.event.pull_request.head.sha }}
+          PR_REF_CTX:    ${{ github.event.pull_request.head.ref }}
+          PR_TITLE_CTX:  ${{ github.event.pull_request.title }}
+          PR_AUTHOR_CTX: ${{ github.event.pull_request.user.login }}
+          PR_URL_CTX:    ${{ github.event.pull_request.html_url }}
+          REPO:          ${{ github.repository }}
+          ISSUE_NUMBER:  ${{ github.event.issue.number }}
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "pr_number=${{ github.event.pull_request.number }}"    >> $GITHUB_OUTPUT
-            echo "pr_sha=${{ github.event.pull_request.head.sha }}"     >> $GITHUB_OUTPUT
-            echo "pr_ref=${{ github.event.pull_request.head.ref }}"     >> $GITHUB_OUTPUT
-            echo "pr_title=${{ github.event.pull_request.title }}"      >> $GITHUB_OUTPUT
-            echo "pr_author=${{ github.event.pull_request.user.login }}" >> $GITHUB_OUTPUT
-            echo "pr_url=${{ github.event.pull_request.html_url }}"     >> $GITHUB_OUTPUT
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            echo "pr_number=$PR_NUMBER_CTX" >> $GITHUB_OUTPUT
+            echo "pr_sha=$PR_SHA_CTX"       >> $GITHUB_OUTPUT
+            echo "pr_ref=$PR_REF_CTX"       >> $GITHUB_OUTPUT
+            echo "pr_title=$PR_TITLE_CTX"   >> $GITHUB_OUTPUT
+            echo "pr_author=$PR_AUTHOR_CTX" >> $GITHUB_OUTPUT
+            echo "pr_url=$PR_URL_CTX"       >> $GITHUB_OUTPUT
           else
-            PR_NUMBER="${{ github.event.issue.number }}"
             PR_JSON=$(curl -s \
               -H "Authorization: token ${GITHUB_TOKEN}" \
               -H "Accept: application/vnd.github.v3+json" \
-              "https://api.github.com/repos/${{ github.repository }}/pulls/${PR_NUMBER}")
+              "https://api.github.com/repos/${REPO}/pulls/${ISSUE_NUMBER}")
 
             PR_SHA=$(echo "${PR_JSON}"    | jq -r '.head.sha')
             PR_REF=$(echo "${PR_JSON}"    | jq -r '.head.ref')
@@ -54,7 +67,7 @@ jobs:
             PR_AUTHOR=$(echo "${PR_JSON}" | jq -r '.user.login')
             PR_URL=$(echo "${PR_JSON}"    | jq -r '.html_url')
 
-            echo "pr_number=${PR_NUMBER}" >> $GITHUB_OUTPUT
+            echo "pr_number=${ISSUE_NUMBER}" >> $GITHUB_OUTPUT
             echo "pr_sha=${PR_SHA}"       >> $GITHUB_OUTPUT
             echo "pr_ref=${PR_REF}"       >> $GITHUB_OUTPUT
             echo "pr_title=${PR_TITLE}"   >> $GITHUB_OUTPUT
@@ -73,16 +86,19 @@ jobs:
           token: ${{ secrets.E2E_TESTS_PAT }}
           repository: terraform-ibm-modules/powervs-sap-e2e-tests
           event-type: backint-pr-test
+          # toJSON() produces a properly escaped JSON string (including surrounding
+          # quotes), so a PR title containing " cannot break out of the literal
+          # and override keys such as pr_sha or pr_ref (JSON injection / CWE-74).
           client-payload: |
             {
-              "pr_number": "${{ steps.pr-details.outputs.pr_number }}",
-              "pr_sha": "${{ steps.pr-details.outputs.pr_sha }}",
-              "pr_ref": "${{ steps.pr-details.outputs.pr_ref }}",
-              "pr_title": "${{ steps.pr-details.outputs.pr_title }}",
-              "pr_author": "${{ steps.pr-details.outputs.pr_author }}",
-              "pr_url": "${{ steps.pr-details.outputs.pr_url }}",
-              "trigger": "${{ github.event_name }}",
-              "triggered_by": "${{ github.event.sender.login }}"
+              "pr_number": ${{ toJSON(steps.pr-details.outputs.pr_number) }},
+              "pr_sha":    ${{ toJSON(steps.pr-details.outputs.pr_sha) }},
+              "pr_ref":    ${{ toJSON(steps.pr-details.outputs.pr_ref) }},
+              "pr_title":  ${{ toJSON(steps.pr-details.outputs.pr_title) }},
+              "pr_author": ${{ toJSON(steps.pr-details.outputs.pr_author) }},
+              "pr_url":    ${{ toJSON(steps.pr-details.outputs.pr_url) }},
+              "trigger":      ${{ toJSON(github.event_name) }},
+              "triggered_by": ${{ toJSON(github.event.sender.login) }}
             }
 
       - name: Comment on PR
